@@ -1,0 +1,13 @@
+# Add your hardcoded URLs here, one per line
+# Lines starting with # are comments and will be ignored
+# Empty lines are also ignored
+
+# Example URLs (uncomment and modify as needed):
+# https://example.com/specific-blog-post
+# https://another-site.com/article
+# https://www.databricksters.com/p/specific-post
+# https://www.canadiandataguy.com/p/another-post
+
+# Add your URLs below:
+https://www.databricks.com/discover/pages/optimize-data-workloads-guide
+https://docs.databricks.com/aws/en/lakehouse-architecture/cost-optimization/best-practices

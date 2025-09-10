@@ -1,0 +1,31 @@
+{
+  "name": "Blog Scraper Job - GitHub Source",
+  "git_source": {
+    "git_url": "https://github.com/jiteshsoni/BrickBrain.git",
+    "git_branch": "scrape_blogs",
+    "git_provider": "github"
+  },
+  "tasks": [
+    {
+      "task_key": "scrape_blogs",
+      "notebook_task": {
+        "notebook_path": "blog_scraper_notebook",
+        "source": "GIT",
+        "base_parameters": {
+          "websites": "https://www.databricksters.com/,https://www.canadiandataguy.com/",
+          "delta_table_name": "main.default.blog_content"
+        }
+      },
+      "compute": {
+        "compute_type": "serverless"
+      },
+      "timeout_seconds": 3600
+    }
+  ],
+  "max_concurrent_runs": 1,
+  "timeout_seconds": 3600,
+  "tags": {
+    "purpose": "blog-scraping",
+    "environment": "production"
+  }
+}

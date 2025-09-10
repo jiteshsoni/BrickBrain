@@ -1,0 +1,6 @@
+requests
+beautifulsoup4
+html2text
+lxml
+urllib3
+databricks-connect
