@@ -17,9 +17,13 @@ resources:
             spark_conf:
               "spark.databricks.delta.preview.enabled": "true"
               "spark.databricks.cluster.profile": "singleNode"
+          source: "GIT"
+          git_source:
+            git_url: "https://github.com/jiteshsoni/BrickBrain"
+            git_provider: "github"
+            git_branch: "scrape_blogs"
           notebook_task:
-            source: "WORKSPACE"
-            notebook_path: "/Repos/jitesh.soni@databricks.com/BrickBrain/bundles/blog-scraper/notebooks/blog_scraper_pipeline"
+            notebook_path: "bundles/blog-scraper/notebooks/blog_scraper_pipeline"
             base_parameters:
               websites: "https://www.databricksters.com/,https://www.canadiandataguy.com/"
               delta_table_name: "main.default.blog_content"
