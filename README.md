@@ -1,212 +1,140 @@
-# BrickBrain - Multi-Bundle Databricks Repository
+# BrickBrain - Blog Scraper
 
-A comprehensive repository containing multiple Databricks Asset Bundles for data engineering, ML, and automation tasks.
+A Python-based blog scraper that automatically discovers and downloads blog posts from specified websites, converting them to markdown and storing them in Delta Lake tables.
 
-## 🏗️ Repository Structure
+## Features
+
+- **Automatic Blog Discovery**: Discovers blog URLs from sitemaps and RSS feeds
+- **Content Conversion**: Converts HTML content to clean markdown format
+- **Delta Lake Storage**: Stores blog content in Delta Lake tables with ACID properties
+- **Metadata Separation**: Maintains separate tables for blog content and scraping metadata
+- **Databricks Integration**: Designed to run on Databricks with serverless compute
+- **Scheduled Execution**: Can be run as scheduled Databricks jobs
+- **Incremental Processing**: Uses merge (upsert) operations to handle updates
+
+## Architecture
 
 ```
-brickbrain/
-├── bundles/                    # Individual Databricks Asset Bundles
-│   ├── blog-scraper/          # Blog content scraping and processing
-│   ├── data-pipeline/         # ETL and data processing pipelines
-│   └── ml-models/             # Machine learning model training and inference
-├── shared/                    # Shared utilities and configurations
-│   ├── utils/                 # Common Python modules
-│   └── configs/               # Shared configuration files
-├── deploy.sh                  # Multi-bundle deployment script
-└── README.md                  # This file
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   Websites      │    │   Blog Scraper   │    │  Delta Tables   │
+│                 │    │                  │    │                 │
+│ • Databricksters│───▶│ • Sitemap Parser │───▶│ • Blog Content  │
+│ • CanadianDataGuy│    │ • Content Fetch  │    │ • Metadata      │
+│ • Custom URLs   │    │ • HTML→Markdown  │    │                 │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
 ```
 
-## 📦 Available Bundles
+## Project Structure
 
-### 1. Blog Scraper Bundle (`bundles/blog-scraper/`)
-- **Purpose**: Automated blog content scraping and storage
-- **Schedule**: Daily at 6 AM UTC
-- **Features**:
-  - Scrapes content from multiple websites
-  - Stores data in Delta tables with merge functionality
-  - Supports hardcoded URLs and dynamic discovery
-  - Comprehensive logging and error handling
-
-### 2. Data Pipeline Bundle (`bundles/data-pipeline/`)
-- **Purpose**: ETL and data processing workflows
-- **Schedule**: Daily at 2 AM UTC
-- **Features**:
-  - Extract, Transform, Load (ETL) operations
-  - Data quality checks and validation
-  - Automated data pipeline orchestration
-
-### 3. ML Models Bundle (`bundles/ml-models/`)
-- **Purpose**: Machine learning model training and inference
-- **Schedule**: 
-  - Training: Weekly on Sunday at 3 AM UTC
-  - Inference: Daily at 4 AM UTC
-- **Features**:
-  - Automated model training workflows
-  - Model versioning with MLflow
-  - Batch inference processing
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Databricks CLI (version 0.218.0+)
-- Access to a Databricks workspace
-- Configured authentication
-
-### Deploy a Specific Bundle
-```bash
-# Deploy the blog scraper bundle
-./deploy.sh deploy blog-scraper
-
-# Deploy the data pipeline bundle
-./deploy.sh deploy data-pipeline
-
-# Deploy the ML models bundle
-./deploy.sh deploy ml-models
+```
+BrickBrain/
+├── blog_scraper.py              # Core scraper logic
+├── blog_scraper_notebook.py     # Databricks notebook entry point
+├── test_scraper.py              # Local testing script
+├── urls.txt                     # Static list of URLs to scrape
+├── job_config.json              # Databricks job configuration
+├── requirements.txt             # Python dependencies
+├── DEVELOPMENT_RULES.md         # Development guidelines
+└── README.md                    # This file
 ```
 
-### Deploy All Bundles
-```bash
-./deploy.sh deploy-all
-```
+## Quick Start
 
-### Run a Bundle
-```bash
-# Run the blog scraper pipeline
-./deploy.sh run blog-scraper
+### Local Testing with Databricks Connect
 
-# List available bundles
-./deploy.sh list
-```
+1. **Setup Environment**:
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
 
-## 🔧 Individual Bundle Usage
+2. **Configure Databricks Connect**:
+   ```bash
+   databricks-connect test
+   ```
 
-### Blog Scraper Bundle
-```bash
-# Navigate to the bundle directory
-cd bundles/blog-scraper
+3. **Run Local Test**:
+   ```bash
+   python test_scraper.py
+   ```
 
-# Deploy the bundle
-databricks bundle deploy
+### Deploy to Databricks
 
-# Run the pipeline
-databricks bundle run blog_scraper_pipeline
+1. **Push to GitHub**:
+   ```bash
+   git add -A
+   git commit -m "Your changes"
+   git push origin scrape_blogs
+   ```
 
-# Run the daily job
-databricks bundle run blog_scraper_daily_job
-```
+2. **Create Databricks Job**:
+   ```bash
+   databricks jobs create --json @job_config.json
+   ```
 
-### Data Pipeline Bundle
-```bash
-cd bundles/data-pipeline
-databricks bundle deploy
-databricks bundle run data_pipeline_daily_job
-```
+3. **Run Job**:
+   ```bash
+   databricks jobs run-now <job-id>
+   ```
 
-### ML Models Bundle
-```bash
-cd bundles/ml-models
-databricks bundle deploy
-databricks bundle run model_training_job
-databricks bundle run model_inference_job
-```
+## Configuration
 
-## 📊 Monitoring and Results
+### Websites to Scrape
 
-### Blog Scraper Results
-- **Delta Table**: `main.default.blog_content`
-- **Query Results**: 
-  ```sql
-  SELECT COUNT(*) FROM main.default.blog_content;
-  SELECT * FROM main.default.blog_content ORDER BY scraped_at DESC LIMIT 10;
-  ```
+The scraper targets these websites by default:
+- `https://www.databricksters.com/`
+- `https://www.canadiandataguy.com/`
 
-### Job Monitoring
-- View job runs in Databricks UI: **Workflows > Jobs**
-- Monitor pipeline runs: **Workflows > Pipelines**
-- Check logs in job run details
+Additional URLs can be added to `urls.txt` for static scraping.
 
-## ⚙️ Configuration
+### Delta Tables
 
-### Environment Variables
-Set these environment variables for deployment:
-```bash
-export DATABRICKS_HOST="https://your-workspace.cloud.databricks.com"
-export DATABRICKS_TOKEN="your-personal-access-token"
-```
+- **Blog Content**: `main.default.blog_content`
+  - `url` (string): Blog post URL (primary key)
+  - `title` (string): Blog post title
+  - `markdown_content` (string): Full content in markdown format
+  - `domain` (string): Source domain
+  - `scraped_at` (timestamp): When the content was scraped
 
-### Bundle-Specific Configuration
-Each bundle has its own `databricks.yml` file with:
-- Resource definitions (jobs, pipelines, clusters)
-- Variable configurations
-- Schedule settings
-- Library dependencies
+- **Metadata**: `main.default.blog_content_metadata`
+  - `metadata_type` (string): Type of metadata (URL_LIST, SCRAPING_SUMMARY)
+  - `metadata_content` (string): JSON metadata content
+  - `created_at` (timestamp): When metadata was created
 
-### Shared Configuration
-Common configurations are stored in `shared/configs/`:
-- `requirements.txt`: Python dependencies
-- `urls.txt`: Hardcoded URLs for blog scraping
+## Dependencies
 
-## 🔄 CI/CD Integration
+- `requests`: HTTP client for fetching web content
+- `beautifulsoup4`: HTML parsing and content extraction
+- `html2text`: HTML to markdown conversion
+- `lxml`: XML/HTML parser
+- `urllib3`: HTTP client utilities
+- `databricks-connect`: Local development with Databricks
 
-### GitHub Actions Example
-```yaml
-name: Deploy BrickBrain Bundles
-on:
-  push:
-    branches: [main]
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-      - name: Install Databricks CLI
-        run: pip install databricks-cli
-      - name: Deploy All Bundles
-        run: ./deploy.sh deploy-all
-        env:
-          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
-          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
-```
+## Development Guidelines
 
-## 🛠️ Development
+See [DEVELOPMENT_RULES.md](DEVELOPMENT_RULES.md) for detailed development guidelines including:
+- Files never to commit
+- DRY principles
+- Databricks-specific rules
 
-### Adding a New Bundle
-1. Create a new directory in `bundles/`
-2. Add a `databricks.yml` configuration file
-3. Create necessary notebooks and source files
-4. Update the deployment script if needed
+## How It Works
 
-### Shared Utilities
-Common Python modules are stored in `shared/utils/`:
-- `blog_scraper.py`: Core blog scraping functionality
-- `run_scraper.py`: Blog scraper entry point
+1. **Discovery**: The scraper reads sitemaps and RSS feeds to discover blog URLs
+2. **Filtering**: URLs are filtered using regex patterns to identify blog posts
+3. **Fetching**: Content is downloaded and parsed using BeautifulSoup
+4. **Conversion**: HTML content is converted to clean markdown
+5. **Storage**: Content is stored in Delta Lake using merge operations
+6. **Metadata**: Scraping statistics and URL lists are stored in a separate metadata table
 
-### Best Practices
-- Use shared utilities to avoid code duplication
-- Follow consistent naming conventions
-- Include comprehensive logging
-- Add proper error handling and retries
-- Document all configuration options
+## Monitoring
 
-## 📚 Resources
+The scraper provides detailed logging and stores metadata including:
+- Total URLs discovered vs. hardcoded
+- Successful vs. failed downloads
+- Scraping timestamps and duration
+- Source website information
 
-- [Databricks Asset Bundles Documentation](https://docs.databricks.com/aws/en/dev-tools/bundles/)
-- [Bundle Configuration Reference](https://docs.databricks.com/aws/en/dev-tools/bundles/config.html)
-- [CI/CD with Bundles](https://docs.databricks.com/aws/en/dev-tools/bundles/ci-cd.html)
+## License
 
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test the bundle deployment
-5. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License.
+This project is for educational and research purposes.
