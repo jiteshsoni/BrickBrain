@@ -1,65 +1,27 @@
-2025-09-09 17:37:29,841 - INFO - Starting blog scraper...
-2025-09-09 17:37:29,841 - INFO - Base websites: ['https://www.databricksters.com/', 'https://www.canadiandataguy.com/']
-2025-09-09 17:37:29,841 - INFO - Hardcoded URLs: 0 URLs
-2025-09-09 17:37:29,842 - INFO - loading DEFAULT profile from ~/.databrickscfg: host, token, cluster_id, jobs-api-version
-2025-09-09 17:37:30,265 - INFO - Connected to Databricks cluster via Databricks Connect
-2025-09-09 17:37:30,265 - INFO - Delta table already exists: default.blog_content
-2025-09-09 17:37:30,265 - INFO - Truncating Delta table...
-2025-09-09 17:37:30,265 - INFO - Delta table already exists: default.blog_content
-2025-09-09 17:37:30,265 - INFO - Discovering blog URLs for https://www.databricksters.com/
-2025-09-09 17:37:30,526 - INFO - Found sitemap at https://www.databricksters.com/sitemap.xml
-2025-09-09 17:37:30,529 - INFO - Identified as blog post: https://www.databricksters.com/p/agents-are-like-onions-they-have
-2025-09-09 17:37:30,529 - INFO - Identified as blog post: https://www.databricksters.com/p/doctors-hate-this-one-dependency
-2025-09-09 17:37:30,530 - INFO - Identified as blog post: https://www.databricksters.com/p/bayesd-and-redpilled
-2025-09-09 17:37:30,530 - INFO - Identified as blog post: https://www.databricksters.com/p/beyond-the-pipeline-the-blueprint
-2025-09-09 17:37:30,530 - INFO - Identified as blog post: https://www.databricksters.com/p/securing-genai-agents-on-databricks
-2025-09-09 17:37:30,530 - INFO - Identified as blog post: https://www.databricksters.com/p/understanding-embedding-model-pricing
-2025-09-09 17:37:30,530 - INFO - Identified as blog post: https://www.databricksters.com/p/its-beaver-time-dont-get-logged-down
-2025-09-09 17:37:30,530 - INFO - Identified as blog post: https://www.databricksters.com/p/write-anywhere-read-everywhere-achieving
-2025-09-09 17:37:30,530 - INFO - Identified as blog post: https://www.databricksters.com/p/mastering-stream-static-joins-in
-2025-09-09 17:37:30,530 - INFO - Identified as blog post: https://www.databricksters.com/p/chat-with-your-data-in-slack-using
-2025-09-09 17:37:30,530 - INFO - Identified as blog post: https://www.databricksters.com/p/the-hidden-price-of-streaming-cutting
-2025-09-09 17:37:30,530 - INFO - Identified as blog post: https://www.databricksters.com/p/databricks-aibi-dashboard-20
-2025-09-09 17:37:30,530 - INFO - Identified as blog post: https://www.databricksters.com/p/juggling-a-model-circus-a-pyfuncs
-2025-09-09 17:37:30,530 - INFO - Identified as blog post: https://www.databricksters.com/p/everything-you-ever-wanted-to-know
-2025-09-09 17:37:30,530 - INFO - Identified as blog post: https://www.databricksters.com/p/pyfunc-it-well-do-it-live
-2025-09-09 17:37:30,530 - INFO - Identified as blog post: https://www.databricksters.com/p/braving-through-the-pitfalls-of-llm
-2025-09-09 17:37:30,530 - INFO - Identified as blog post: https://www.databricksters.com/p/databricks-vector-search-similarity
-2025-09-09 17:37:30,530 - INFO - Identified as blog post: https://www.databricksters.com/p/how-to-actually-delete-data-in-spark
-2025-09-09 17:37:30,530 - INFO - Identified as blog post: https://www.databricksters.com/p/on-the-topic-of-llms-and-non-determinism
-2025-09-09 17:37:30,530 - INFO - Identified as blog post: https://www.databricksters.com/p/concurrent-execution-and-query-throughput
-2025-09-09 17:37:30,530 - INFO - Identified as blog post: https://www.databricksters.com/p/archiving-data-in-databricks-lakehouse
-2025-09-09 17:37:30,530 - INFO - Identified as blog post: https://www.databricksters.com/p/a-beginners-guide-to-mlops-stacks
-2025-09-09 17:37:30,530 - INFO - Identified as blog post: https://www.databricksters.com/p/spark-file-reads-at-warp-speed-3
-2025-09-09 17:37:30,530 - INFO - Identified as blog post: https://www.databricksters.com/p/deploying-deepseek-r1-distill-qwen
-2025-09-09 17:37:30,530 - INFO - Identified as blog post: https://www.databricksters.com/p/orchestrating-databricks-workflows
-2025-09-09 17:37:30,688 - INFO - Discovered 25 blog URLs for https://www.databricksters.com/
-2025-09-09 17:37:32,691 - INFO - Discovering blog URLs for https://www.canadiandataguy.com/
-2025-09-09 17:37:33,140 - INFO - Found sitemap at https://www.canadiandataguy.com/sitemap.xml
-2025-09-09 17:37:33,148 - INFO - Identified as blog post: https://www.canadiandataguy.com/p/how-many-spark-streaming-jobs-can
-2025-09-09 17:37:33,148 - INFO - Identified as blog post: https://www.canadiandataguy.com/p/how-to-ace-and-structure-your-data
-2025-09-09 17:37:33,148 - INFO - Identified as blog post: https://www.canadiandataguy.com/p/a-deep-dive-into-skewed-joins-groupby
-2025-09-09 17:37:33,148 - INFO - Identified as blog post: https://www.canadiandataguy.com/p/spark-join-strategies
-2025-09-09 17:37:33,148 - INFO - Identified as blog post: https://www.canadiandataguy.com/p/how-to-read-delta-log-statistics
-2025-09-09 17:37:33,148 - INFO - Identified as blog post: https://www.canadiandataguy.com/p/when-data-engineering-met-ai
-2025-09-09 17:37:33,148 - INFO - Identified as blog post: https://www.canadiandataguy.com/p/why-your-pyspark-udf-is-slowing-everything
-2025-09-09 17:37:33,149 - INFO - Identified as blog post: https://www.canadiandataguy.com/p/what-a-netflix-senior-data-engineer
-2025-09-09 17:37:33,149 - INFO - Identified as blog post: https://www.canadiandataguy.com/p/how-do-i-think-about-setting-spark
-2025-09-09 17:37:33,149 - INFO - Identified as blog post: https://www.canadiandataguy.com/p/spark-join-strategies-explained-broadcast
-2025-09-09 17:37:33,149 - INFO - Identified as blog post: https://www.canadiandataguy.com/p/one-spark-function-to-rule-all-your
-2025-09-09 17:37:33,149 - INFO - Identified as blog post: https://www.canadiandataguy.com/p/spark-join-strategies-explained-shuffle
-2025-09-09 17:37:33,149 - INFO - Identified as blog post: https://www.canadiandataguy.com/p/spark-join-strategies-explained-sort
-2025-09-09 17:37:33,149 - INFO - Identified as blog post: https://www.canadiandataguy.com/p/your-degree-isnt-enough-how-to-actually
-2025-09-09 17:37:33,149 - INFO - Identified as blog post: https://www.canadiandataguy.com/p/how-to-generate-1tb-of-synthetic
-2025-09-09 17:37:33,149 - INFO - Identified as blog post: https://www.canadiandataguy.com/p/ensuring-data-quality-in-the-hybrid
-2025-09-09 17:37:33,149 - INFO - Identified as blog post: https://www.canadiandataguy.com/p/what-is-delta-lake-how-does-it-work
-2025-09-09 17:37:33,149 - INFO - Identified as blog post: https://www.canadiandataguy.com/p/how-to-write-your-first-spark-stream
-2025-09-09 17:37:33,149 - INFO - Identified as blog post: https://www.canadiandataguy.com/p/i-spent-5-hours-reading-the-original
-2025-09-09 17:37:33,149 - INFO - Identified as blog post: https://www.canadiandataguy.com/p/how-to-upgrade-your-spark-stream
-2025-09-09 17:37:33,150 - INFO - Identified as blog post: https://www.canadiandataguy.com/p/spark-streaming-best-practices-a
-2025-09-09 17:37:33,150 - INFO - Identified as blog post: https://www.canadiandataguy.com/p/understanding-kafka-architecture
-2025-09-09 17:37:33,150 - INFO - Identified as blog post: https://www.canadiandataguy.com/p/how-to-excel-in-data-interviews-in-2024
-2025-09-09 17:37:33,150 - INFO - Identified as blog post: https://www.canadiandataguy.com/p/optimizing-delta-lake-tables-liquid
-2025-09-09 17:37:33,150 - INFO - Identified as blog post: https://www.canadiandataguy.com/p/streaming-any-file-type-with-autoloader-in-databricks-a-working-guide-ce83c68f7fd9
-2025-09-09 17:37:33,297 - INFO - Discovered 25 blog URLs for https://www.canadiandataguy.com/
-2025-09-09 17:37:35,300 - INFO - Total unique blog URLs found: 50
+2025-09-09 18:51:23,753 - INFO - === Testing Notebook Import Logic ===
+2025-09-09 18:51:23,753 - INFO - Websites to scrape: ['https://www.databricksters.com/', 'https://www.canadiandataguy.com/']
+2025-09-09 18:51:23,753 - INFO - Delta table: main.default.blog_content_test
+2025-09-09 18:51:23,754 - INFO - loading DEFAULT profile from ~/.databrickscfg: host, token, cluster_id
+2025-09-09 18:51:24,107 - INFO - Connected to Databricks cluster via Databricks Connect
+2025-09-09 18:51:24,107 - INFO - Delta table already exists: main.default.blog_content_test
+2025-09-09 18:51:24,107 - INFO - ✅ BlogScraper initialized successfully
+2025-09-09 18:51:24,107 - INFO - ✅ Loaded 2 hardcoded URLs
+2025-09-09 18:51:24,107 - INFO - ✅ Testing quick scraper operation...
+2025-09-09 18:51:24,107 - INFO - Delta table already exists: main.default.blog_content_test
+2025-09-09 18:51:24,107 - INFO - ✅ Delta table initialized
+2025-09-09 18:51:25,159 - INFO - ✅ Table query successful: 7 records
+2025-09-09 18:51:25,160 - INFO - ✅ All notebook logic tests passed!
+2025-09-09 18:56:33,121 - INFO - Testing with websites: ['https://www.databricksters.com/', 'https://www.canadiandataguy.com/']
+2025-09-09 18:56:33,121 - INFO - Using Delta table: main.default.blog_content_test
+2025-09-09 18:56:33,121 - INFO - loading DEFAULT profile from ~/.databrickscfg: host, token, cluster_id
+2025-09-09 18:56:33,454 - INFO - Connected to Databricks cluster via Databricks Connect
+2025-09-09 18:56:33,454 - INFO - Delta table already exists: main.default.blog_content_test
+2025-09-09 18:56:33,454 - INFO - Loaded 2 hardcoded URLs
+2025-09-09 18:56:33,454 - INFO - Testing with 2 specific URLs: ['https://www.databricksters.com/p/chat-with-your-data-in-slack-using', 'https://www.canadiandataguy.com/p/how-do-i-think-about-setting-spark']
+2025-09-09 18:56:33,454 - INFO - Delta table already exists: main.default.blog_content_test
+2025-09-09 18:56:33,454 - INFO - Processing test 1/2: https://www.databricksters.com/p/chat-with-your-data-in-slack-using
+2025-09-09 18:56:33,701 - ERROR - Failed to process https://www.databricksters.com/p/chat-with-your-data-in-slack-using: too many values to unpack (expected 2)
+2025-09-09 18:56:33,701 - INFO - Processing test 2/2: https://www.canadiandataguy.com/p/how-do-i-think-about-setting-spark
+2025-09-09 18:56:33,926 - ERROR - Failed to process https://www.canadiandataguy.com/p/how-do-i-think-about-setting-spark: too many values to unpack (expected 2)
+2025-09-09 18:56:34,930 - INFO - Total records in table: 7
+2025-09-09 18:56:36,745 - INFO - Blog scraping test completed successfully!

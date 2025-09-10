@@ -1,56 +1,24 @@
 {
-  "name": "Blog Scraper Job",
+  "name": "Blog Scraper Job - GitHub Source",
+  "git_source": {
+    "git_url": "https://github.com/jiteshsoni/BrickBrain.git",
+    "git_branch": "scrape_blogs",
+    "git_provider": "github"
+  },
   "tasks": [
     {
       "task_key": "scrape_blogs",
       "notebook_task": {
-        "notebook_path": "/Repos/jitesh.soni@databricks.com/BrickBrain/blog_scraper_notebook",
+        "notebook_path": "blog_scraper_notebook",
+        "source": "GIT",
         "base_parameters": {
           "websites": "https://www.databricksters.com/,https://www.canadiandataguy.com/",
           "delta_table_name": "main.default.blog_content"
         }
       },
-      "new_cluster": {
-        "spark_version": "13.3.x-scala2.12",
-        "node_type_id": "i3.xlarge",
-        "num_workers": 1,
-        "spark_conf": {
-          "spark.databricks.delta.preview.enabled": "true",
-          "spark.databricks.cluster.profile": "singleNode"
-        }
+      "compute": {
+        "compute_type": "serverless"
       },
-      "libraries": [
-        {
-          "pypi": {
-            "package": "requests>=2.31.0"
-          }
-        },
-        {
-          "pypi": {
-            "package": "beautifulsoup4>=4.12.0"
-          }
-        },
-        {
-          "pypi": {
-            "package": "html2text>=2020.1.16"
-          }
-        },
-        {
-          "pypi": {
-            "package": "lxml>=4.9.0"
-          }
-        },
-        {
-          "pypi": {
-            "package": "urllib3>=2.0.0"
-          }
-        },
-        {
-          "pypi": {
-            "package": "databricks-connect>=15.0.0"
-          }
-        }
-      ],
       "timeout_seconds": 3600
     }
   ],

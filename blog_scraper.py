@@ -35,6 +35,7 @@ class BlogScraper:
     def __init__(self, base_urls: List[str], delta_table_path: str = "blog_content_delta"):
         self.base_urls = base_urls
         self.delta_table_path = delta_table_path
+        self.metadata_table_path = delta_table_path + "_metadata"
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -47,8 +48,9 @@ class BlogScraper:
         # Initialize Spark session with Delta Lake
         self.spark = self._init_spark_session()
         
-        # Initialize the Delta table
+        # Initialize the Delta tables
         self._init_delta_table()
+        self._init_metadata_table()
     
     def _init_spark_session(self):
         """Initialize Spark session using Databricks Connect"""
@@ -90,6 +92,33 @@ class BlogScraper:
                 .saveAsTable(self.delta_table_path)
             
             logger.info(f"Created new Delta table: {self.delta_table_path}")
+    
+    def _init_metadata_table(self):
+        """Initialize or create the metadata Delta table if it doesn't exist"""
+        try:
+            # Check if metadata table exists
+            self.spark.table(self.metadata_table_path)
+            logger.info(f"Metadata table already exists: {self.metadata_table_path}")
+        except Exception:
+            # Table doesn't exist, create it
+            logger.info(f"Creating new metadata table: {self.metadata_table_path}")
+            schema = StructType([
+                StructField("metadata_type", StringType(), False),
+                StructField("metadata_content", StringType(), True),
+                StructField("created_at", StringType(), True)
+            ])
+            
+            # Create empty DataFrame with schema
+            empty_df = self.spark.createDataFrame([], schema)
+            
+            # Write to Delta table
+            empty_df.write \
+                .format("delta") \
+                .mode("overwrite") \
+                .option("overwriteSchema", "true") \
+                .saveAsTable(self.metadata_table_path)
+            
+            logger.info(f"Created new metadata table: {self.metadata_table_path}")
     
     def get_sitemap_urls(self, base_url: str) -> List[str]:
         """Try to find sitemap and extract URLs"""
@@ -394,36 +423,33 @@ class BlogScraper:
                 .saveAsTable(self.delta_table_path)
     
     def _save_url_list_to_delta(self, unique_urls: List[str], hardcoded_urls: List[str] = None):
-        """Save URL list information to Delta table"""
+        """Save URL list information to metadata table"""
         url_list_data = {
-            "url": "URL_LIST_METADATA",
-            "title": "URL List Metadata",
-            "markdown_content": json.dumps({
+            "metadata_type": "URL_LIST",
+            "metadata_content": json.dumps({
                 'urls': unique_urls,
                 'scraped_at': datetime.now().isoformat(),
                 'total_count': len(unique_urls),
                 'hardcoded_urls_count': len(hardcoded_urls) if hardcoded_urls else 0,
                 'discovered_urls_count': len(unique_urls) - (len(hardcoded_urls) if hardcoded_urls else 0)
             }, indent=2),
-            "domain": "METADATA",
-            "scraped_at": datetime.now().isoformat()
+            "created_at": datetime.now().isoformat()
         }
         
         df = self.spark.createDataFrame([url_list_data])
         df.write \
             .format("delta") \
             .mode("append") \
-            .saveAsTable(self.delta_table_path)
+            .saveAsTable(self.metadata_table_path)
         
-        logger.info("Saved URL list metadata to Delta table")
+        logger.info("Saved URL list metadata to metadata table")
     
     def _save_summary_to_delta(self, unique_urls: List[str], successful_downloads: int, 
                               failed_downloads: int, hardcoded_urls: List[str] = None):
-        """Save scraping summary to Delta table"""
+        """Save scraping summary to metadata table"""
         summary_data = {
-            "url": "SCRAPING_SUMMARY",
-            "title": "Scraping Summary",
-            "markdown_content": json.dumps({
+            "metadata_type": "SCRAPING_SUMMARY",
+            "metadata_content": json.dumps({
                 'total_urls': len(unique_urls),
                 'successful_downloads': successful_downloads,
                 'failed_downloads': failed_downloads,
@@ -432,17 +458,16 @@ class BlogScraper:
                 'discovered_urls_count': len(unique_urls) - (len(hardcoded_urls) if hardcoded_urls else 0),
                 'completed_at': datetime.now().isoformat()
             }, indent=2),
-            "domain": "METADATA",
-            "scraped_at": datetime.now().isoformat()
+            "created_at": datetime.now().isoformat()
         }
         
         df = self.spark.createDataFrame([summary_data])
         df.write \
             .format("delta") \
             .mode("append") \
-            .saveAsTable(self.delta_table_path)
+            .saveAsTable(self.metadata_table_path)
         
-        logger.info("Saved scraping summary to Delta table")
+        logger.info("Saved scraping summary to metadata table")
     
     def scrape_all_blogs(self, hardcoded_urls: List[str] = None):
         """Main method to scrape all blogs from all websites"""

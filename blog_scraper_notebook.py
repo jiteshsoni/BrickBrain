@@ -79,18 +79,27 @@ except Exception as e:
 # Display summary of scraped data
 df = spark.table(delta_table_name)
 total_records = df.count()
-blog_posts = df.filter(~df.url.isin("URL_LIST_METADATA", "SCRAPING_SUMMARY")).count()
 
-print(f"Total records in table: {total_records}")
-print(f"Blog posts scraped: {blog_posts}")
-print(f"Metadata records: {total_records - blog_posts}")
+print(f"Blog posts scraped: {total_records}")
 
 # Show sample of recent blog posts
 print("\nRecent blog posts:")
-df.filter(~df.url.isin("URL_LIST_METADATA", "SCRAPING_SUMMARY")) \
-  .select("url", "title", "domain", "scraped_at") \
+df.select("url", "title", "domain", "scraped_at") \
   .orderBy("scraped_at", ascending=False) \
   .show(10, truncate=False)
+
+# Show metadata from separate table
+metadata_table_name = delta_table_name + "_metadata"
+try:
+    metadata_df = spark.table(metadata_table_name)
+    metadata_count = metadata_df.count()
+    print(f"\nMetadata records: {metadata_count}")
+    print("\nLatest metadata:")
+    metadata_df.select("metadata_type", "created_at") \
+      .orderBy("created_at", ascending=False) \
+      .show(5, truncate=False)
+except Exception as e:
+    print(f"No metadata table found: {e}")
 
 # COMMAND ----------
 
