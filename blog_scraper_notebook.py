@@ -12,11 +12,7 @@
 # COMMAND ----------
 
 # Install required packages
-%pip install requests
-%pip install beautifulsoup4
-%pip install html2text
-%pip install lxml
-%pip install urllib3
+%pip install requests beautifulsoup4 html2text lxml urllib3
 
 # COMMAND ----------
 
