@@ -18,8 +18,7 @@ resources:
               "spark.databricks.delta.preview.enabled": "true"
               "spark.databricks.cluster.profile": "singleNode"
           notebook_task:
-            notebook_path: "/Repos/jitesh.soni@databricks.com/BrickBrain/bundles/blog-scraper/notebooks/blog_scraper_pipeline"
-            repo_id: 3865646456334687
+            notebook_path: "https://github.com/jiteshsoni/BrickBrain/blob/scrape_blogs/bundles/blog-scraper/notebooks/blog_scraper_pipeline.py"
             base_parameters:
               websites: "https://www.databricksters.com/,https://www.canadiandataguy.com/"
               delta_table_name: "main.default.blog_content"
