@@ -54,7 +54,7 @@ try:
     # Read hardcoded URLs from file if it exists
     hardcoded_urls = []
     try:
-        with open('/Workspace/Repos/jitesh.soni@databricks.com/BrickBrain/urls.txt', 'r') as f:
+        with open('urls.txt', 'r') as f:
             hardcoded_urls = [line.strip() for line in f if line.strip() and not line.startswith('#')]
         logger.info(f"Loaded {len(hardcoded_urls)} hardcoded URLs")
     except FileNotFoundError:
