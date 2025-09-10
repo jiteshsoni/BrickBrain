@@ -19,8 +19,7 @@
 from blog_scraper import BlogScraper
 import logging
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Get logger without configuring basicConfig (Databricks handles this)
 logger = logging.getLogger(__name__)
 
 # COMMAND ----------
