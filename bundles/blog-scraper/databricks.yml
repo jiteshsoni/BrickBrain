@@ -18,7 +18,7 @@ resources:
               "spark.databricks.delta.preview.enabled": "true"
               "spark.databricks.cluster.profile": "singleNode"
           notebook_task:
-            notebook_path: "bundles/blog-scraper/notebooks/blog_scraper_pipeline"
+            notebook_path: "/Shared/brickbrain/blog-scraper/notebooks/blog_scraper_pipeline"
             base_parameters:
               websites: "https://www.databricksters.com/,https://www.canadiandataguy.com/"
               delta_table_name: "main.default.blog_content"
@@ -48,27 +48,6 @@ resources:
         purpose: "blog-scraping"
         environment: "production"
         team: "data-engineering"
-
-  pipelines:
-    blog_scraper_pipeline:
-      name: "Blog Scraper Pipeline"
-      storage: "/Shared/brickbrain/blog-scraper/pipeline_storage"
-      configuration:
-        "blog_scraper.websites": "https://www.databricksters.com/,https://www.canadiandataguy.com/"
-        "blog_scraper.delta_table": "main.default.blog_content"
-      libraries:
-        - notebook:
-            notebook_path: "bundles/blog-scraper/notebooks/blog_scraper_pipeline"
-      clusters:
-        - label: "default"
-          num_workers: 1
-          node_type_id: "i3.xlarge"
-          custom_tags:
-            "purpose": "blog-scraping"
-      development: true
-      continuous: false
-      photon: false
-      serverless: false
 
 variables:
   websites:
