@@ -11,9 +11,7 @@
 
 # COMMAND ----------
 
-# Run the blog_scraper module to make BlogScraper available
-%run ./blog_scraper
-
+from blog_scraper import BlogScraper
 import logging
 
 # Configure logging
