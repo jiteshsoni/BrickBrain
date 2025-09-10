@@ -11,6 +11,15 @@
 
 # COMMAND ----------
 
+# Install required packages
+%pip install requests>=2.31.0
+%pip install beautifulsoup4>=4.12.0
+%pip install html2text>=2020.1.16
+%pip install lxml>=4.9.0
+%pip install urllib3>=2.0.0
+
+# COMMAND ----------
+
 from blog_scraper import BlogScraper
 import logging
 
