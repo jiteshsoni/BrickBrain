@@ -20,15 +20,15 @@ from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType
 import databricks.connect as dbc
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('blog_scraper.log'),
-        logging.StreamHandler()
-    ]
-)
+# Configure logging (only if not already configured, e.g., in Databricks)
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler()  # Remove FileHandler for Databricks compatibility
+        ]
+    )
 logger = logging.getLogger(__name__)
 
 class BlogScraper:
