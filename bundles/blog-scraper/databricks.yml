@@ -5,6 +5,11 @@ workspace:
   root_path: /Shared/brickbrain/blog-scraper
 
 resources:
+  git_credentials:
+    github:
+      git_username: "jiteshsoni"
+      git_provider: "github"
+
   jobs:
     blog_scraper_daily_job:
       name: "Blog Scraper - Daily Job"
@@ -17,13 +22,11 @@ resources:
             spark_conf:
               "spark.databricks.delta.preview.enabled": "true"
               "spark.databricks.cluster.profile": "singleNode"
-          source: "GIT"
-          git_source:
-            git_url: "https://github.com/jiteshsoni/BrickBrain"
-            git_provider: "github"
-            git_branch: "scrape_blogs"
           notebook_task:
-            notebook_path: "bundles/blog-scraper/notebooks/blog_scraper_pipeline"
+            source: "GIT"
+            url: "https://github.com/jiteshsoni/BrickBrain"
+            branch: "scrape_blogs"
+            path: "bundles/blog-scraper/notebooks/blog_scraper_pipeline"
             base_parameters:
               websites: "https://www.databricksters.com/,https://www.canadiandataguy.com/"
               delta_table_name: "main.default.blog_content"
