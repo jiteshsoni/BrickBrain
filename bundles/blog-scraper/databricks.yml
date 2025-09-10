@@ -1,9 +1,5 @@
 bundle:
   name: blog-scraper
-  git:
-    origin_url: https://github.com/jiteshsoni/BrickBrain.git
-    provider: github
-    branch: scrape_blogs
 
 workspace:
   root_path: /Shared/brickbrain/blog-scraper
@@ -22,8 +18,7 @@ resources:
               "spark.databricks.delta.preview.enabled": "true"
               "spark.databricks.cluster.profile": "singleNode"
           notebook_task:
-            source: "GIT"
-            path: "bundles/blog-scraper/notebooks/blog_scraper_pipeline.py"
+            notebook_path: "bundles/blog-scraper/notebooks/blog_scraper_pipeline"
             base_parameters:
               websites: "https://www.databricksters.com/,https://www.canadiandataguy.com/"
               delta_table_name: "main.default.blog_content"
@@ -63,8 +58,7 @@ resources:
         "blog_scraper.delta_table": "main.default.blog_content"
       libraries:
         - notebook:
-            source: "GIT"
-            path: "bundles/blog-scraper/notebooks/blog_scraper_pipeline.py"
+            notebook_path: "bundles/blog-scraper/notebooks/blog_scraper_pipeline"
       clusters:
         - label: "default"
           num_workers: 1
