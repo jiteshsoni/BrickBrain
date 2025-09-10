@@ -1,0 +1,59 @@
+{
+  "name": "Blog Scraper - Simple Job",
+  "new_cluster": {
+    "spark_version": "13.3.x-scala2.12",
+    "node_type_id": "i3.xlarge",
+    "num_workers": 1,
+    "spark_conf": {
+      "spark.databricks.delta.preview.enabled": "true",
+      "spark.databricks.cluster.profile": "singleNode"
+    }
+  },
+  "notebook_task": {
+    "notebook_path": "/Repos/jitesh.soni@databricks.com/BrickBrain/bundles/blog-scraper/notebooks/blog_scraper_pipeline",
+    "base_parameters": {
+      "websites": "https://www.databricksters.com/,https://www.canadiandataguy.com/",
+      "delta_table_name": "main.default.blog_content"
+    }
+  },
+  "libraries": [
+    {
+      "pypi": {
+        "package": "requests>=2.31.0"
+      }
+    },
+    {
+      "pypi": {
+        "package": "beautifulsoup4>=4.12.0"
+      }
+    },
+    {
+      "pypi": {
+        "package": "html2text>=2020.1.16"
+      }
+    },
+    {
+      "pypi": {
+        "package": "lxml>=4.9.0"
+      }
+    },
+    {
+      "pypi": {
+        "package": "urllib3>=2.0.0"
+      }
+    },
+    {
+      "pypi": {
+        "package": "databricks-connect>=15.0.0"
+      }
+    }
+  ],
+  "timeout_seconds": 3600,
+  "max_retries": 2,
+  "retry_on_timeout": true,
+  "tags": {
+    "purpose": "blog-scraping",
+    "environment": "production",
+    "team": "data-engineering"
+  }
+}
