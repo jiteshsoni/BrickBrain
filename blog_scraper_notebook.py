@@ -11,7 +11,9 @@
 
 # COMMAND ----------
 
-from blog_scraper import BlogScraper
+# Run the blog_scraper module to make BlogScraper available
+%run ./blog_scraper
+
 import logging
 
 # Configure logging
@@ -25,9 +27,13 @@ logger = logging.getLogger(__name__)
 
 # COMMAND ----------
 
+# Set up widgets with defaults
+dbutils.widgets.text("websites", "https://www.databricksters.com/,https://www.canadiandataguy.com/", "Websites to scrape")
+dbutils.widgets.text("delta_table_name", "main.default.blog_content", "Delta table name")
+
 # Get configuration from pipeline parameters
 websites = dbutils.widgets.get("websites").split(",")
-delta_table_name = dbutils.widgets.get("delta_table_name", "main.default.blog_content")
+delta_table_name = dbutils.widgets.get("delta_table_name")
 
 logger.info(f"Websites to scrape: {websites}")
 logger.info(f"Delta table: {delta_table_name}")
@@ -46,7 +52,7 @@ try:
     # Read hardcoded URLs from file if it exists
     hardcoded_urls = []
     try:
-        with open('urls.txt', 'r') as f:
+        with open('/Workspace/Repos/jitesh.soni@databricks.com/BrickBrain/urls.txt', 'r') as f:
             hardcoded_urls = [line.strip() for line in f if line.strip() and not line.startswith('#')]
         logger.info(f"Loaded {len(hardcoded_urls)} hardcoded URLs")
     except FileNotFoundError:
