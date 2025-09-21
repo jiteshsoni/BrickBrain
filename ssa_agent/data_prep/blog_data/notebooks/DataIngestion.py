@@ -1,49 +1,46 @@
 # Databricks notebook source
-# MAGIC %md
-# MAGIC # Blog Scraper Pipeline
-# MAGIC 
-# MAGIC This notebook runs the blog scraper as a Databricks pipeline.
+# MAGIC %pip install requests beautifulsoup4 html2text lxml urllib3
+# MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## Import and Setup
+########################################################################################################################
+# Blog Scraper Data Ingestion Pipeline
+# 
+# inputs: 
+# - bundle_root: path to the bundle root
+# - websites: comma-separated list of websites to scrape
+# - delta_table_name: name of the delta table to save the data to
+# - urls_file: optional file with hardcoded URLs (relative to bundle_root)
+#
+########################################################################################################################
 
 # COMMAND ----------
 
-# Install required packages
-%pip install requests beautifulsoup4 html2text lxml urllib3
+bundle_root = dbutils.widgets.get("bundle_root")
+websites = dbutils.widgets.get("websites") # "https://www.databricksters.com/,https://www.canadiandataguy.com/"
+delta_table_name = dbutils.widgets.get("delta_table_name") # "main.default.blog_content"
+urls_file = dbutils.widgets.get("urls_file") if dbutils.widgets.get("urls_file") else "urls.txt" # "urls.txt"
 
 # COMMAND ----------
 
-from blog_scraper import BlogScraper
+import sys
+import os
 import logging
 
-# Get logger without configuring basicConfig (Databricks handles this)
+sys.path.append(bundle_root)
+
+from data_prep.blog_data.utils.blog_scraper import BlogScraper
+
 logger = logging.getLogger(__name__)
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## Configuration
-
-# COMMAND ----------
-
-# Set up widgets with defaults
-dbutils.widgets.text("websites", "https://www.databricksters.com/,https://www.canadiandataguy.com/", "Websites to scrape")
-dbutils.widgets.text("delta_table_name", "main.default.blog_content", "Delta table name")
-
 # Get configuration from pipeline parameters
-websites = dbutils.widgets.get("websites").split(",")
-delta_table_name = dbutils.widgets.get("delta_table_name")
+websites = websites.split(",")
 
 logger.info(f"Websites to scrape: {websites}")
 logger.info(f"Delta table: {delta_table_name}")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Run Blog Scraper
 
 # COMMAND ----------
 
@@ -53,12 +50,13 @@ try:
     
     # Read hardcoded URLs from file if it exists
     hardcoded_urls = []
+    urls_file_path = os.path.join(bundle_root, urls_file)
     try:
-        with open('urls.txt', 'r') as f:
+        with open(urls_file_path, 'r') as f:
             hardcoded_urls = [line.strip() for line in f if line.strip() and not line.startswith('#')]
-        logger.info(f"Loaded {len(hardcoded_urls)} hardcoded URLs")
+        logger.info(f"Loaded {len(hardcoded_urls)} hardcoded URLs from {urls_file_path}")
     except FileNotFoundError:
-        logger.info("No urls.txt file found, using only discovered URLs")
+        logger.info(f"No {urls_file_path} file found, using only discovered URLs")
     
     # Run the scraper
     scraper.scrape_all_blogs(hardcoded_urls=hardcoded_urls)
@@ -100,10 +98,3 @@ try:
       .show(5, truncate=False)
 except Exception as e:
     print(f"No metadata table found: {e}")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Pipeline Complete
-# MAGIC 
-# MAGIC The blog scraper has successfully completed. Check the Delta table for the latest blog content.
