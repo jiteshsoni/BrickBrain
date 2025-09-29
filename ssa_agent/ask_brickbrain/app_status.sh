@@ -83,10 +83,12 @@ echo "  --databricks-token \"$DATABRICKS_TOKEN\" \\"
 echo "  --endpoint-name \"$ENDPOINT_NAME\""
 echo ""
 
-# Show GitHub URL (if this becomes a repo)
-REPO_URL="https://github.com/databricks-solutions/brickbrain-mcp.git"
-echo "📦 Future GitHub installation:"
-echo "uvx --from git+$REPO_URL brickbrain-mcp \\"
+# Show GitHub installation
+REPO_URL="https://github.com/jiteshsoni/BrickBrain.git"
+echo "📦 GitHub installation:"
+echo "git clone $REPO_URL"
+echo "cd BrickBrain/ssa_agent/ask_brickbrain"
+echo "uvx --with databricks-sdk python ./brickbrain_mcp.py \\"
 echo "  --databricks-host \"$DATABRICKS_HOST\" \\"
 echo "  --databricks-token \"$DATABRICKS_TOKEN\" \\"
 echo "  --endpoint-name \"$ENDPOINT_NAME\""
