@@ -27,11 +27,15 @@ A Model Context Protocol (MCP) server that provides intelligent Databricks assis
 - `uv`/`uvx` installed ([installation guide](https://docs.astral.sh/uv/getting-started/installation/))
 - `claude` CLI (optional, for easy MCP setup)
 
-### 🎯 Fastest Setup (Recommended)
+### 🎯 Quick Setup (Recommended)
 ```bash
-# One-command installation from GitHub (replace with your credentials)
-claude mcp add databricks-mcp-local --scope local -- \
-  uvx --from git+ssh://git@github.com/databricks-solutions/brickbrain-mcp.git brickbrain-mcp \
+# Clone the repository
+git clone https://github.com/jiteshsoni/BrickBrain.git
+cd BrickBrain/ssa_agent/ask_brickbrain
+
+# One-command installation with Claude CLI (replace with your credentials)
+claude mcp add brickbrain-mcp --scope local -- \
+  uvx --with databricks-sdk python "$(pwd)/brickbrain_mcp.py" \
   --databricks-host "https://dbc-xxxxxxxx-xxxx.cloud.databricks.com" \
   --databricks-token "dapi1234567890abcdef" \
   --endpoint-name "ka-xxxxxxxx-endpoint"
@@ -41,8 +45,8 @@ claude mcp add databricks-mcp-local --scope local -- \
 
 1. **Clone and setup:**
    ```bash
-   git clone https://github.com/databricks-solutions/brickbrain-mcp.git
-   cd brickbrain-mcp
+   git clone https://github.com/jiteshsoni/BrickBrain.git
+   cd BrickBrain/ssa_agent/ask_brickbrain
    chmod +x *.sh
    ./setup.sh
    ```
@@ -193,18 +197,18 @@ python brickbrain_mcp.py test \
 uvx --with databricks-sdk python /path/to/brickbrain_mcp.py
 ```
 
-### From GitHub (SSH)
+### From GitHub 
 ```bash
-claude mcp add databricks-mcp-local --scope local -- \
-  uvx --from git+ssh://git@github.com/databricks-solutions/brickbrain-mcp.git brickbrain-mcp \
+# Clone and setup from GitHub
+git clone https://github.com/jiteshsoni/BrickBrain.git
+cd BrickBrain/ssa_agent/ask_brickbrain
+
+# Install with Claude CLI
+claude mcp add brickbrain-mcp --scope local -- \
+  uvx --with databricks-sdk python "$(pwd)/brickbrain_mcp.py" \
   --databricks-host "$DATABRICKS_HOST" \
   --databricks-token "$DATABRICKS_TOKEN" \
   --endpoint-name "$ENDPOINT_NAME"
-```
-
-### From GitHub (HTTPS)
-```bash
-uvx --from git+https://github.com/databricks-solutions/brickbrain-mcp.git brickbrain-mcp
 ```
 
 ### From PyPI (future)
@@ -244,7 +248,7 @@ MIT License - see LICENSE file for details.
 
 ## 🆘 Support
 
-- **Issues**: [GitHub Issues](https://github.com/databricks-solutions/brickbrain-mcp/issues)
+- **Issues**: [GitHub Issues](https://github.com/jiteshsoni/BrickBrain/issues)
 - **Documentation**: This README and inline code documentation
 - **Databricks**: [Databricks Documentation](https://docs.databricks.com/)
 

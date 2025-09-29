@@ -18,8 +18,8 @@ requires-python = ">=3.8"
 brickbrain-mcp = "brickbrain_mcp:main"
 
 [project.urls]
-Homepage = "https://github.com/databricks-solutions/brickbrain-mcp"
-Repository = "https://github.com/databricks-solutions/brickbrain-mcp.git"
+Homepage = "https://github.com/jiteshsoni/BrickBrain/tree/main/ssa_agent/ask_brickbrain"
+Repository = "https://github.com/jiteshsoni/BrickBrain.git"
 
 [tool.hatch.build.targets.wheel]
 packages = ["brickbrain_mcp.py"]
