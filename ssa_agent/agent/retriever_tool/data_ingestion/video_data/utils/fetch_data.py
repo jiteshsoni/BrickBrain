@@ -96,7 +96,6 @@ class YouTubeClient:
 
 
 class TranscriptClient:
-        
     def __init__(self, proxy_username: str, proxy_password: str):
         # fyi: proxy is used to avoid rate limiting
         # using free webshare proxy, but can use any other proxy

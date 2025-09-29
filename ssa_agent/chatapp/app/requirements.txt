@@ -1,0 +1,6 @@
+psycopg[binary]
+psycopg-pool
+mlflow>=2.21.2
+streamlit==1.44.1
+databricks-sdk
+PyMuPDF

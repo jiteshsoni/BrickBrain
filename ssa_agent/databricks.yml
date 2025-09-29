@@ -15,3 +15,8 @@ targets:
     workspace:
       # TODO: add dev workspace URL
       host: https://e2-demo-field-eng.cloud.databricks.com/
+
+  stage: 
+    mode: development
+    workspace: 
+      host: https://dbc-6e6fe5de-0b7d.cloud.databricks.com/

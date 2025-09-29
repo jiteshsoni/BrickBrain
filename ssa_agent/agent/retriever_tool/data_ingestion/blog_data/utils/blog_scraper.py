@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
 """
-Blog Scraper for Databricksters and Canadian Data Guy
-Dynamically detects all blog posts and downloads content as markdown
+Blog scraper for Substack blogs. 
+
+Downloads all content as markdown files. 
 """
 
 import requests
@@ -13,14 +13,9 @@ from urllib.parse import urljoin, urlparse
 from pathlib import Path
 import logging
 from typing import List, Set, Dict
-import json
 from datetime import datetime
 import html2text
-from pyspark.sql import SparkSession
-from pyspark.sql.types import StructType, StructField, StringType
-import databricks.connect as dbc
 
-# Configure logging (only if not already configured, e.g., in Databricks)
 if not logging.getLogger().handlers:
     logging.basicConfig(
         level=logging.INFO,
@@ -32,10 +27,14 @@ if not logging.getLogger().handlers:
 logger = logging.getLogger(__name__)
 
 class BlogScraper:
-    def __init__(self, base_urls: List[str], delta_table_path: str = "blog_content_delta"):
-        self.base_urls = base_urls
-        self.delta_table_path = delta_table_path
-        self.metadata_table_path = delta_table_path + "_metadata"
+    def __init__(self, base_urls: List[str]):
+        if isinstance(base_urls, str):
+            self.base_urls = [base_urls]
+            logger.warning(f"base_urls was passed as string, converted to list: {self.base_urls}")
+        elif isinstance(base_urls, list):
+            self.base_urls = base_urls
+        else:
+            raise ValueError(f"base_urls must be a string or list of strings, got {type(base_urls)}")
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -44,81 +43,6 @@ class BlogScraper:
         self.h2t.ignore_links = False
         self.h2t.ignore_images = False
         self.h2t.body_width = 0  # Don't wrap lines
-        
-        # Initialize Spark session with Delta Lake
-        self.spark = self._init_spark_session()
-        
-        # Initialize the Delta tables
-        self._init_delta_table()
-        self._init_metadata_table()
-    
-    def _init_spark_session(self):
-        """Initialize Spark session using Databricks Connect"""
-        try:
-            # Use Databricks Connect to connect to remote cluster
-            spark = dbc.DatabricksSession.builder.getOrCreate()
-            logger.info("Connected to Databricks cluster via Databricks Connect")
-            return spark
-        except Exception as e:
-            logger.error(f"Failed to connect to Databricks cluster: {e}")
-            logger.info("Make sure you have configured Databricks Connect properly")
-            raise
-    
-    def _init_delta_table(self):
-        """Initialize or create the Delta table if it doesn't exist"""
-        try:
-            # Check if table exists
-            self.spark.table(self.delta_table_path)
-            logger.info(f"Delta table already exists: {self.delta_table_path}")
-        except Exception:
-            # Table doesn't exist, create it
-            logger.info(f"Creating new Delta table: {self.delta_table_path}")
-            schema = StructType([
-                StructField("url", StringType(), False),
-                StructField("title", StringType(), True),
-                StructField("markdown_content", StringType(), True),
-                StructField("domain", StringType(), True),
-                StructField("scraped_at", StringType(), True)
-            ])
-            
-            # Create empty DataFrame with schema
-            empty_df = self.spark.createDataFrame([], schema)
-            
-            # Write to Delta table
-            empty_df.write \
-                .format("delta") \
-                .mode("overwrite") \
-                .option("overwriteSchema", "true") \
-                .saveAsTable(self.delta_table_path)
-            
-            logger.info(f"Created new Delta table: {self.delta_table_path}")
-    
-    def _init_metadata_table(self):
-        """Initialize or create the metadata Delta table if it doesn't exist"""
-        try:
-            # Check if metadata table exists
-            self.spark.table(self.metadata_table_path)
-            logger.info(f"Metadata table already exists: {self.metadata_table_path}")
-        except Exception:
-            # Table doesn't exist, create it
-            logger.info(f"Creating new metadata table: {self.metadata_table_path}")
-            schema = StructType([
-                StructField("metadata_type", StringType(), False),
-                StructField("metadata_content", StringType(), True),
-                StructField("created_at", StringType(), True)
-            ])
-            
-            # Create empty DataFrame with schema
-            empty_df = self.spark.createDataFrame([], schema)
-            
-            # Write to Delta table
-            empty_df.write \
-                .format("delta") \
-                .mode("overwrite") \
-                .option("overwriteSchema", "true") \
-                .saveAsTable(self.metadata_table_path)
-            
-            logger.info(f"Created new metadata table: {self.metadata_table_path}")
     
     def get_sitemap_urls(self, base_url: str) -> List[str]:
         """Try to find sitemap and extract URLs"""
@@ -290,10 +214,52 @@ class BlogScraper:
             soup = BeautifulSoup(response.content, 'html.parser')
             
             # Remove unwanted elements
-            for element in soup(['script', 'style', 'nav', 'footer', 'header', 'aside', 'advertisement']):
-                element.decompose()
+            unwanted_selectors = [
+                'script', 'style', 'nav', 'footer', 'header', 'aside', 'advertisement',
+                '.advertisement', '.ads', '.ad', '.sidebar', '.social-share', '.share-buttons',
+                '.newsletter-signup', '.subscribe', '.subscribe-widget', '.email-signup',
+                '.author-bio', '.author-card', '.author-info', '.bio-card',
+                '.related-posts', '.recommended', '.you-might-also-like',
+                '.pagination', '.nav-links', '.page-nav',
+                '.comments', '.comment-section', '.comment-form',
+                '.tags', '.tag-list', '.category-list', '.post-meta',
+                '.breadcrumbs', '.breadcrumb',
+                '.social-media', '.social-links', '.follow-buttons',
+                '.popup', '.modal', '.overlay',
+                '.cookie-notice', '.cookie-banner',
+                '.search-box', '.search-form',
+                '[data-testid="authorByline"]', 
+                '[data-testid="like-button"]',   
+                '[data-testid="share"]',         
+                '[data-testid="subscribe"]',    
+                '.post-header-meta',             
+                '.post-date', '.publish-date',   
+                '.reading-time',                 
+                'img[src*="avatar"]',            
+                'img[src*="profile"]',           
+                'img[alt*="avatar"]',            
+                'img[alt*="profile"]'           
+            ]
             
-            # Try to find the main content (Substack-specific selectors first)
+            for selector in unwanted_selectors:
+                for element in soup.select(selector):
+                    element.decompose()
+            
+            for element in soup.find_all():
+                if element.name:
+                    classes = element.get('class', [])
+                    if any(keyword in ' '.join(classes).lower() for keyword in 
+                           ['subscribe', 'share', 'social', 'author', 'meta', 'ad', 'popup', 'modal']):
+                        element.decompose()
+                        continue
+                    
+                    text = element.get_text().strip().lower()
+                    if any(keyword in text for keyword in 
+                           ['subscribe', 'follow me', 'share this', 'like this post', 'sign up']):
+                        if len(text) < 100:  # Only remove short elements with these phrases
+                            element.decompose()
+                            continue
+            
             content_selectors = [
                 '.post-content',           # Substack post content
                 '.entry-content',          # Substack entry content
@@ -314,6 +280,14 @@ class BlogScraper:
             
             if not main_content:
                 main_content = soup.find('body')
+            
+            if main_content:
+                for element in main_content.find_all(['iframe', 'embed', 'object']):
+                    element.decompose()
+                
+                for element in main_content.find_all(['p', 'div']):
+                    if not element.get_text().strip():
+                        element.decompose()
             
             # Extract title (Substack-specific selectors first)
             title = None
@@ -347,9 +321,7 @@ class BlogScraper:
             # Convert to markdown
             markdown_content = self.h2t.handle(str(main_content))
             
-            # Clean up markdown
-            markdown_content = re.sub(r'\n\s*\n\s*\n', '\n\n', markdown_content)  # Remove excessive newlines
-            markdown_content = markdown_content.strip()
+            markdown_content = self._clean_markdown_content(markdown_content)
             
             return {
                 'metadata': metadata,
@@ -365,116 +337,53 @@ class BlogScraper:
                 'success': False
             }
     
-    def save_blog_post(self, blog_data: Dict, domain: str):
-        """Save blog post to Delta table using merge (upsert)"""
-        if not blog_data['success']:
-            return
+    def _clean_markdown_content(self, content: str) -> str:
+        if not content:
+            return ""
         
-        metadata = blog_data['metadata']
-        content = blog_data['content']
+        patterns_to_remove = [
+            r'\[!\[.*?\]\(.*?\)\]\(.*?\)',  # Image links with complex markdown
+            r'!\[.*?avatar.*?\]\(.*?\)',    # Avatar images
+            r'!\[.*?profile.*?\]\(.*?\)',   # Profile images
+            r'\*\*\[.*?\]\(.*?\)\*\*\s*\n',  # Bold linked author names
+            r'\[.*?\]\(javascript:void\(0\)\)',  # JavaScript links
+            r'\*\*Sep \d+, \d+\*\*',        # Date patterns
+            r'\*\*\d+\*\*\s*\n',            # Numbers (like social counts)
+            r'\[Share\]\(.*?\)',            # Share links
+            r'\[\]\(.*?comments\)',         # Comment links
+            r'Subscribe.*?\n',              # Subscribe text
+            r'Sign up.*?\n',                # Sign up text
+            r'Follow.*?\n',                 # Follow text
+        ]
         
-        # Prepare data for Delta table
-        row_data = {
-            "url": metadata['url'],
-            "title": metadata['title'],
-            "markdown_content": content,
-            "domain": metadata['domain'],
-            "scraped_at": metadata['scraped_at']
-        }
+        for pattern in patterns_to_remove:
+            content = re.sub(pattern, '', content, flags=re.IGNORECASE)
         
-        # Create DataFrame with single row
-        df = self.spark.createDataFrame([row_data])
+        content = re.sub(r'\n\s*\n\s*\n+', '\n\n', content)
+        content = re.sub(r'[ \t]+', ' ', content)
+        content = re.sub(r'\n\s+\n', '\n\n', content)
         
-        # Merge to Delta table (upsert based on URL)
-        self._merge_blog_post(df)
+        lines = content.split('\n')
+        cleaned_lines = []
         
-        logger.info(f"Saved/updated in Delta table: {metadata['url']}")
-    
-    def _merge_blog_post(self, new_df):
-        """Merge new blog post data into existing table"""
-        try:
-            # Create temporary view for merge
-            new_df.createOrReplaceTempView("new_blog_data")
+        for line in lines:
+            line = line.strip()
+            if len(line) < 3:
+                continue
+            if any(keyword in line.lower() for keyword in 
+                   ['subscribe', 'follow', 'share', 'comments', 'like this']):
+                continue
+            if re.match(r'^[\d\s\[\]()]+$', line):
+                continue
             
-            # Perform merge operation
-            merge_sql = f"""
-            MERGE INTO {self.delta_table_path} AS target
-            USING new_blog_data AS source
-            ON target.url = source.url
-            WHEN MATCHED THEN
-                UPDATE SET 
-                    title = source.title,
-                    markdown_content = source.markdown_content,
-                    domain = source.domain,
-                    scraped_at = source.scraped_at
-            WHEN NOT MATCHED THEN
-                INSERT (url, title, markdown_content, domain, scraped_at)
-                VALUES (source.url, source.title, source.markdown_content, source.domain, source.scraped_at)
-            """
-            
-            self.spark.sql(merge_sql)
-            
-        except Exception as e:
-            logger.error(f"Error during merge operation: {e}")
-            # Fallback to append if merge fails
-            new_df.write \
-                .format("delta") \
-                .mode("append") \
-                .saveAsTable(self.delta_table_path)
-    
-    def _save_url_list_to_delta(self, unique_urls: List[str], hardcoded_urls: List[str] = None):
-        """Save URL list information to metadata table"""
-        url_list_data = {
-            "metadata_type": "URL_LIST",
-            "metadata_content": json.dumps({
-                'urls': unique_urls,
-                'scraped_at': datetime.now().isoformat(),
-                'total_count': len(unique_urls),
-                'hardcoded_urls_count': len(hardcoded_urls) if hardcoded_urls else 0,
-                'discovered_urls_count': len(unique_urls) - (len(hardcoded_urls) if hardcoded_urls else 0)
-            }, indent=2),
-            "created_at": datetime.now().isoformat()
-        }
+            cleaned_lines.append(line)
         
-        df = self.spark.createDataFrame([url_list_data])
-        df.write \
-            .format("delta") \
-            .mode("append") \
-            .saveAsTable(self.metadata_table_path)
+        content = '\n'.join(cleaned_lines)
         
-        logger.info("Saved URL list metadata to metadata table")
-    
-    def _save_summary_to_delta(self, unique_urls: List[str], successful_downloads: int, 
-                              failed_downloads: int, hardcoded_urls: List[str] = None):
-        """Save scraping summary to metadata table"""
-        summary_data = {
-            "metadata_type": "SCRAPING_SUMMARY",
-            "metadata_content": json.dumps({
-                'total_urls': len(unique_urls),
-                'successful_downloads': successful_downloads,
-                'failed_downloads': failed_downloads,
-                'websites': self.base_urls,
-                'hardcoded_urls_count': len(hardcoded_urls) if hardcoded_urls else 0,
-                'discovered_urls_count': len(unique_urls) - (len(hardcoded_urls) if hardcoded_urls else 0),
-                'completed_at': datetime.now().isoformat()
-            }, indent=2),
-            "created_at": datetime.now().isoformat()
-        }
-        
-        df = self.spark.createDataFrame([summary_data])
-        df.write \
-            .format("delta") \
-            .mode("append") \
-            .saveAsTable(self.metadata_table_path)
-        
-        logger.info("Saved scraping summary to metadata table")
+        return content.strip()
     
     def scrape_all_blogs(self, hardcoded_urls: List[str] = None):
         """Main method to scrape all blogs from all websites"""
-        # Truncate the Delta table at the beginning
-        logger.info("Truncating Delta table...")
-        self._init_delta_table()  # This overwrites the table with empty schema
-        
         all_urls = []
         
         # Add hardcoded URLs first
@@ -492,12 +401,10 @@ class BlogScraper:
         unique_urls = list(set(all_urls))
         logger.info(f"Total unique blog URLs found: {len(unique_urls)}")
         
-        # Save URL list to Delta table as well
-        self._save_url_list_to_delta(unique_urls, hardcoded_urls)
-        
         # Download and convert each blog post
         successful_downloads = 0
         failed_downloads = 0
+        blog_posts_data = []
         
         for i, url in enumerate(unique_urls, 1):
             logger.info(f"Processing {i}/{len(unique_urls)}: {url}")
@@ -506,8 +413,17 @@ class BlogScraper:
             domain = urlparse(url).netloc.replace('www.', '')
             
             if blog_data['success']:
-                self.save_blog_post(blog_data, domain)
+                # Prepare data for DataFrame
+                row_data = {
+                    "url": blog_data['metadata']['url'],
+                    "title": blog_data['metadata']['title'],
+                    "markdown_content": blog_data['content'],
+                    "domain": blog_data['metadata']['domain'],
+                    "scraped_at": blog_data['metadata']['scraped_at']
+                }
+                blog_posts_data.append(row_data)
                 successful_downloads += 1
+                logger.info(f"Successfully processed: {blog_data['metadata']['title']}")
             else:
                 failed_downloads += 1
                 logger.error(f"Failed to download: {url}")
@@ -517,28 +433,25 @@ class BlogScraper:
         
         logger.info(f"Scraping complete! Success: {successful_downloads}, Failed: {failed_downloads}")
         
-        # Save summary to Delta table
-        self._save_summary_to_delta(unique_urls, successful_downloads, failed_downloads, hardcoded_urls)
-        
-        # Show final table count
-        final_count = self.spark.table(self.delta_table_path).count()
-        logger.info(f"Final Delta table contains {final_count} records")
-
-def main():
-    """Main function"""
-    # Static list of URLs as requested
-    websites = [
-        "https://www.databricksters.com/",
-        "https://www.canadiandataguy.com/"
-    ]
-    
-    # Create scraper instance
-    scraper = BlogScraper(websites, output_dir="blog_content")
-    
-    # Start scraping
-    logger.info("Starting blog scraping process...")
-    scraper.scrape_all_blogs()
-    logger.info("Blog scraping completed!")
-
-if __name__ == "__main__":
-    main()
+        # Create and return DataFrame
+        if blog_posts_data:
+            from pyspark.sql import SparkSession
+            spark = SparkSession.getActiveSession()
+            df = spark.createDataFrame(blog_posts_data)
+            logger.info(f"Created DataFrame with {df.count()} blog posts")
+            return df
+        else:
+            logger.warning("No blog posts were successfully scraped")
+            from pyspark.sql import SparkSession
+            from pyspark.sql.types import StructType, StructField, StringType
+            spark = SparkSession.getActiveSession()
+            # Return empty DataFrame with correct schema
+            schema = StructType([
+                StructField("url", StringType(), False),
+                StructField("title", StringType(), True),
+                StructField("markdown_content", StringType(), True),
+                StructField("domain", StringType(), True),
+                StructField("scraped_at", StringType(), True)
+            ])
+            empty_df = spark.createDataFrame([], schema)
+            return empty_df

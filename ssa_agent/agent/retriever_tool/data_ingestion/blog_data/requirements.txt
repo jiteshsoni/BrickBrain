@@ -4,3 +4,5 @@ html2text
 lxml
 urllib3
 databricks-connect
+transformers
+langchain-text-splitters
