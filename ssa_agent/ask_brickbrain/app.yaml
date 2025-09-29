@@ -1,0 +1,4 @@
+command: [
+    'python',
+    'brickbrain_mcp.py'
+]

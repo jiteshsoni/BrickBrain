@@ -1,0 +1,14 @@
+bundle:
+  name: brickbrain_mcp_server_v2
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: https://dbc-6e6fe5de-0b7d.cloud.databricks.com/?o=2876898140402128
+    resources:
+      apps:
+        brickbrain_mcp_server_v2:
+          name: "brickbrain-mcp-server-v2"
+          source_code_path: "."
