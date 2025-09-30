@@ -16,6 +16,7 @@ import time
 import urllib.parse
 import base64
 import json
+from databricks.sdk.service.jobs import JobSettings, GitSource, NotebookTask, JobCompute, JobTaskSettings
 
 
 from conversation import ConversationDB
@@ -27,12 +28,12 @@ logger = logging.getLogger("__BRICKBRAIN_SLACKBOT__")
 mlflow.set_tracking_uri("databricks")
 mlflow.set_registry_uri("databricks-uc")
 mlflow_client = get_deploy_client("databricks")
-online_store = "brickbrain-conversation-history"
+online_store = os.getenv("ONLINE_STORE")
 CONVERSATION_DB = ConversationDB(online_store=online_store, catalog_name="databricks_postgres")
-ENDPOINT_NAME = "ka-ce79c9c6-endpoint"
-EXPERIMENT = mlflow.set_experiment("/Users/jitesh.soni@databricks.com/ka-ce79c9c6-dev-experiment")
+ENDPOINT_NAME = os.getenv("KA_ENDPOINT_NAME")
+EXPERIMENT = mlflow.set_experiment(os.getenv("EXPERIMENT_PATH"))
 LABELLING_SESSION = get_labelling_session(labelling_session_name="slack")
-APP_URL = "https://brickbrain-stream-lit-2876898140402128.aws.databricksapps.com/"
+APP_URL = os.getenv("APP_URL")
 
 def get_thread_messages(client, channel, thread_ts):
     response = client.conversations_replies(
@@ -66,7 +67,7 @@ def generate_app_url(thread_ts):
     }
     query_string = urllib.parse.urlencode(params)
     return f"{APP_URL}?{query_string}"
-
+        
 def clean_footnotes_for_slack(text):
     text = re.sub(r'\[\^[^\]]+\]', '', text)
     lines = text.split('\n')
@@ -126,7 +127,6 @@ app = start_slack_client()
 @app.event("message")
 def llm_response(event, say, client):
     logger.info(f"Message received - User: {event['user']}, Text: {event['text'][:20]}...")
-
     if "brickbrain" not in event['text'].lower():
         logger.info(f"Skipping LLM call. No mention. ")
         return

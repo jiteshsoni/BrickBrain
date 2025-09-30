@@ -19,14 +19,27 @@
 
 # COMMAND ----------
 
-KEY = dbutils.secrets.get(scope="brickbrain_ssa_agent_scope", key="youtube_api_key")
+bundle_root = dbutils.widgets.get("bundle_root")
 channel_name = dbutils.widgets.get("channel_name")
-max_videos = dbutils.widgets.get("max_videos") #1
+max_videos = int(dbutils.widgets.get("max_videos")) 
 max_workers = 5 
 webshare_proxy_username = dbutils.secrets.get(scope="brickbrain_ssa_agent_scope", key="webshare_proxy_username")
 webshare_proxy_password = dbutils.secrets.get(scope="brickbrain_ssa_agent_scope", key="webshare_proxy_password") 
-raw_youtube_content_table = dbutils.widgets.get("raw_youtube_content_table") #users.veena_ramesh.raw_video_transcriptions"
-preprocessed_youtube_content_table = dbutils.widgets.get("preprocessed_youtube_content_table") #users.veena_ramesh.preprocessed_video_transcriptions"
+youtube_api_key = dbutils.secrets.get(scope="brickbrain_ssa_agent_scope", key="youtube_api_key")
+raw_youtube_content_table = dbutils.widgets.get("raw_youtube_content_table")
+preprocessed_youtube_content_table = dbutils.widgets.get("preprocessed_youtube_content_table")
+
+assert bundle_root, "Bundle root is required"
+assert channel_name, "Channel name is required"
+assert max_videos, "Max videos is required"
+assert raw_youtube_content_table, "Raw youtube content table is required"
+assert preprocessed_youtube_content_table, "Preprocessed youtube content table is required"
+
+print(f"Bundle root: {bundle_root}")
+print(f"Channel name: {channel_name}")
+print(f"Max videos: {max_videos}")
+print(f"Raw table: {raw_youtube_content_table}")
+print(f"Preprocessed table: {preprocessed_youtube_content_table}")
 
 # COMMAND ----------
 
@@ -39,13 +52,13 @@ sys.path.append(bundle_root)
 
 from retriever_tool.data_ingestion.video_data.utils import YouTubeClient, TranscriptClient, TranscriptCleaner
 
-from pyspark.sql.functions import pandas_udf, lit, col, expr, concat, regexp_replace, trim, when, length
+from pyspark.sql.functions import pandas_udf, lit, col, expr, concat
 from pyspark.sql.types import StringType
 import pandas as pd 
 
 # COMMAND ----------
 
-youtube_client = YouTubeClient(KEY)
+youtube_client = YouTubeClient(youtube_api_key)
 
 transcription_service = TranscriptClient(
     proxy_username=webshare_proxy_username,
@@ -78,7 +91,7 @@ print(f"- Failed: {len(transcribed_videos) - successful_transcriptions}")
 # COMMAND ----------
 
 df = spark.createDataFrame(transcribed_videos)
-df.write.mode('overwrite').saveAsTable(f"{raw_data_table}")
+df.write.mode('overwrite').saveAsTable(f"{raw_youtube_content_table}")
 df.display()
 
 # COMMAND ----------
@@ -122,5 +135,5 @@ df_cleaned = (
       .select("url", "domain", "transcription_ai_cleaned")
 ) 
 
-df_cleaned.write.mode('overwrite').saveAsTable(f"{cleaned_data_table}")
+df_cleaned.write.mode('overwrite').saveAsTable(f"{preprocessed_youtube_content_table}")
 df_cleaned.display()

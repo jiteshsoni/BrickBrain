@@ -4,11 +4,36 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Define variables
-vector_search_endpoint = "brickbrain"
-vector_search_index = "veena_ramesh_test.data.brickbrain_index"
-preprocessed_data_table = "veena_ramesh_test.data.brickbrain_delta_table"
-source_tables = []
+########################################################################################################################
+# Vector Search ingestion pipeline
+# 
+# inputs: 
+# - vector_search_endpoint: endpoint
+# - vector_search_index: name of index
+# - preprocessed_data_table: name of delta table to write all tables to
+# - source_tables_str: comma sep list of tables to union together. Enforced schema. 
+#
+########################################################################################################################
+
+# COMMAND ----------
+
+
+# DBTITLE 1,Define variables from parameters
+vector_search_endpoint = dbutils.widgets.get("vector_search_endpoint")
+vector_search_index = dbutils.widgets.get("vector_search_index")
+preprocessed_data_table = dbutils.widgets.get("preprocessed_data_table")
+source_tables_str = dbutils.widgets.get("source_tables")
+source_tables = [table.strip() for table in source_tables_str.split(",") if table.strip()]
+
+assert vector_search_endpoint, "Vector Search Endpoint is required"
+assert vector_search_index, "Vector Search Index is required"
+assert preprocessed_data_table, "Preprocessed Data Table is required"
+assert len(source_tables) > 0, "Source Tables are required"
+
+print(f"Vector Search Endpoint: {vector_search_endpoint}")
+print(f"Vector Search Index: {vector_search_index}")
+print(f"Preprocessed Data Table: {preprocessed_data_table}")
+print(f"Number of Source Tables: {len(source_tables)}")
 
 # COMMAND ----------
 
