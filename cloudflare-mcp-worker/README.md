@@ -1,294 +1,327 @@
-# BrickBrain MCP Bridge - Cloudflare Worker
+# 🧠 BrickBrain - Databricks AI Assistant
 
-A Model Context Protocol (MCP) server that bridges to your Databricks Agent (BrickBrain), hosted on Cloudflare Workers.
-
-## 🚀 Features
-
-- **MCP Protocol Support**: SSE and Streamable HTTP transports
-- **Databricks Agent Bridge**: Direct connection to your BrickBrain agent
-- **Edge Deployment**: Global Cloudflare network for low latency
-- **Secure**: Optional shared key authentication for clients
-- **Free Tier**: Cloudflare Workers free tier (100,000 requests/day)
-- **Zero Maintenance**: Serverless, auto-scaling
-
-## 📋 Prerequisites
-
-1. **Cloudflare Account**: [Sign up for free](https://dash.cloudflare.com/sign-up)
-2. **Node.js**: v18 or higher
-3. **Databricks Agent**: Your BrickBrain serving endpoint
-4. **Wrangler CLI**: Cloudflare's CLI tool
-
-## 🛠️ Setup
-
-### 1. Install Dependencies
-
-```bash
-cd cloudflare-mcp-worker
-npm install
-```
-
-### 2. Authenticate with Cloudflare
-
-```bash
-npx wrangler login
-```
-
-This will open a browser window to authenticate with your Cloudflare account.
-
-### 3. Set Secrets
-
-Set your Databricks credentials as Worker secrets:
-
-```bash
-# Your Databricks serving endpoint URL
-npx wrangler secret put DATABRICKS_SERVING_URL
-# When prompted, enter: https://dbc-a657af2e-14d9.cloud.databricks.com/serving-endpoints/ka-1ff550b7-endpoint/invocations
-
-# Your Databricks token
-npx wrangler secret put DATABRICKS_TOKEN
-# When prompted, paste your Databricks PAT token
-
-# Optional: Shared key for client authentication
-npx wrangler secret put MCP_SHARED_KEY
-# When prompted, enter a strong random key (e.g., generated with: openssl rand -hex 32)
-```
-
-### 4. Test Locally
-
-```bash
-npm run dev
-```
-
-Visit `http://localhost:8787` to see the health check.
-
-Test the MCP endpoint:
-```bash
-curl -X POST http://localhost:8787/mcp \
-  -H "Content-Type: application/json" \
-  -H "x-mcp-key: YOUR_SHARED_KEY" \
-  -d '{
-    "method": "tools/call",
-    "params": {
-      "name": "ask_brickbrain",
-      "arguments": {
-        "prompt": "What is Delta Lake?"
-      }
-    }
-  }'
-```
-
-### 5. Deploy to Cloudflare
-
-```bash
-npm run deploy
-```
-
-After deployment, you'll get a URL like:
-```
-https://brickbrain-mcp-bridge.YOUR-SUBDOMAIN.workers.dev
-```
-
-## 🔧 Configuration
-
-### Custom Domain (Optional)
-
-1. Add a route in `wrangler.toml`:
-```toml
-routes = [
-  { pattern = "mcp.yourdomain.com", custom_domain = true }
-]
-```
-
-2. Redeploy:
-```bash
-npm run deploy
-```
-
-### Environment Variables
-
-Set in `wrangler.toml`:
-- Non-sensitive variables: Add to `[vars]` section
-- Sensitive variables: Use `wrangler secret put`
-
-## 📱 Usage
-
-### In Cursor
-
-Add to your `~/.cursor/mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "brickbrain": {
-      "transport": {
-        "type": "streamableHttp",
-        "url": "https://brickbrain-mcp-bridge.YOUR-SUBDOMAIN.workers.dev/mcp",
-        "headers": {
-          "x-mcp-key": "YOUR_SHARED_KEY"
-        }
-      }
-    }
-  }
-}
-```
-
-### In Claude Desktop
-
-Add to your Claude Desktop MCP configuration:
-
-```json
-{
-  "mcpServers": {
-    "brickbrain": {
-      "url": "https://brickbrain-mcp-bridge.YOUR-SUBDOMAIN.workers.dev/mcp",
-      "transport": "streamableHttp",
-      "headers": {
-        "x-mcp-key": "YOUR_SHARED_KEY"
-      }
-    }
-  }
-}
-```
-
-### Available MCP Tools
-
-#### `ask_brickbrain`
-
-Ask questions about Databricks and get expert answers with citations.
-
-**Parameters:**
-- `prompt` (required): Your question
-- `conversation_id` (optional): Maintain context across questions
-- `user_id` (optional): User identifier for tracking
-- `return_trace` (optional): Include execution trace
-
-**Example:**
-```typescript
-{
-  "prompt": "How do I optimize Delta Lake tables?",
-  "conversation_id": "session-123",
-  "return_trace": false
-}
-```
-
-## 🔍 Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | Health check and service info |
-| `/mcp` | POST | MCP Streamable HTTP transport (recommended) |
-| `/sse` | GET | MCP SSE transport |
-
-## 🐛 Debugging
-
-### View Live Logs
-
-```bash
-npm run tail
-```
-
-### Test Locally with Dev Server
-
-```bash
-npm run dev
-# Opens on http://localhost:8787
-```
-
-### Check Deployment Status
-
-```bash
-wrangler deployments list
-```
-
-## 📊 Monitoring
-
-View metrics in Cloudflare Dashboard:
-1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com)
-2. Navigate to **Workers & Pages**
-3. Click on **brickbrain-mcp-bridge**
-4. View requests, errors, and performance
-
-## 🔒 Security
-
-### Authentication
-
-The worker supports optional client authentication via the `x-mcp-key` header:
-
-1. Generate a strong random key:
-```bash
-openssl rand -hex 32
-```
-
-2. Set it as a secret:
-```bash
-npx wrangler secret put MCP_SHARED_KEY
-```
-
-3. Include it in client requests:
-```bash
-curl -H "x-mcp-key: YOUR_KEY" ...
-```
-
-### Best Practices
-
-- ✅ Always use secrets for sensitive data
-- ✅ Rotate tokens regularly
-- ✅ Use custom domain with HTTPS
-- ✅ Monitor request patterns for abuse
-- ✅ Set rate limits if needed
-
-## 💰 Costs
-
-**Cloudflare Workers Free Tier:**
-- 100,000 requests/day
-- 10ms CPU time per request
-- Unlimited bandwidth
-
-**Beyond Free Tier:**
-- $5/month for 10M requests
-- Additional $0.50 per million requests
-
-Your BrickBrain usage should easily fit in the free tier!
-
-## 🚨 Troubleshooting
-
-### "Module not found: agents"
-
-The Cloudflare Agents SDK may still be in beta. If you encounter this:
-
-1. Check the [Cloudflare Agents documentation](https://developers.cloudflare.com/agents)
-2. Alternatively, implement a basic MCP protocol handler using Hono
-
-### "Authentication failed"
-
-- Verify `DATABRICKS_TOKEN` is set correctly
-- Check token permissions in Databricks
-- Ensure serving endpoint URL is correct
-
-### "Rate limit exceeded"
-
-If you hit Cloudflare's free tier limits:
-1. Upgrade to Workers Paid plan
-2. Implement caching for common queries
-3. Add request throttling
-
-## 📚 Resources
-
-- [Cloudflare Workers Docs](https://developers.cloudflare.com/workers/)
-- [Wrangler CLI Docs](https://developers.cloudflare.com/workers/wrangler/)
-- [MCP Specification](https://modelcontextprotocol.io)
-- [Databricks Agent Framework](https://docs.databricks.com/en/generative-ai/agent-framework/index.html)
-
-## 🤝 Contributing
-
-Issues and PRs welcome!
-
-## 📄 License
-
-MIT License - see LICENSE file for details.
+Ask questions about Databricks, Spark, Delta Lake, MLflow, Unity Catalog, and data engineering - get expert answers with citations!
 
 ---
 
-**Deployed at**: `https://brickbrain-mcp-bridge.YOUR-SUBDOMAIN.workers.dev`  
-**Health Check**: Visit the root URL to verify deployment
+## ⚡ Quick Setup (2 minutes)
 
+### Step 1: Download the Bridge Script
+
+**Mac/Linux:**
+```bash
+curl -o ~/brickbrain-bridge.sh https://raw.githubusercontent.com/jiteshsoni/BrickBrain/main/cloudflare-mcp-worker/mcp-bridge.sh
+chmod +x ~/brickbrain-bridge.sh
+```
+
+**Windows (Git Bash or WSL):**
+```bash
+curl -o ~/brickbrain-bridge.sh https://raw.githubusercontent.com/jiteshsoni/BrickBrain/main/cloudflare-mcp-worker/mcp-bridge.sh
+chmod +x ~/brickbrain-bridge.sh
+```
+
+### Step 2: Configure Cursor
+
+Create or edit `~/.cursor/mcp.json`:
+
+**Mac/Linux:**
+```bash
+mkdir -p ~/.cursor
+nano ~/.cursor/mcp.json
+```
+
+**Windows (PowerShell):**
+```powershell
+mkdir $env:USERPROFILE\.cursor -Force
+notepad $env:USERPROFILE\.cursor\mcp.json
+```
+
+Paste this configuration **(copy exactly as shown - no changes needed!)**:
+
+```json
+{
+  "mcpServers": {
+    "brickbrain": {
+      "command": "/bin/bash",
+      "args": ["-c", "exec ~/brickbrain-bridge.sh"]
+    }
+  }
+}
+```
+
+**✅ That's it!** No username replacements needed - `~/` automatically points to your home directory.
+
+<details>
+<summary>🔧 Alternative: Inline Configuration (no separate file needed)</summary>
+
+If you prefer not to download a separate script, use this all-in-one config:
+
+```json
+{
+  "mcpServers": {
+    "brickbrain": {
+      "command": "bash",
+      "args": [
+        "-c",
+        "while IFS= read -r line; do [ -n \"$line\" ] && curl -s -X POST --max-time 180 -H 'Content-Type: application/json' -H 'x-mcp-key: 3eacb5a9b446c3507dfa5b84dc0e335a7c9f5e70801579ee9f35247fcd1c7369' -d \"$line\" https://brickbrain-mcp-bridge.get2jitesh.workers.dev/mcp; done"
+      ]
+    }
+  }
+}
+```
+
+This works but is harder to read and maintain.
+</details>
+
+### Step 3: Restart Cursor
+
+Completely quit and reopen Cursor (not just refresh - fully quit and relaunch).
+
+### Step 4: Start Using!
+
+```
+@brickbrain ask_brickbrain "What is Delta Lake?"
+```
+
+**That's it!** 🎉
+
+---
+
+## 💬 Usage Examples
+
+### Basic Questions
+```
+@brickbrain ask_brickbrain "How do I optimize Delta Lake tables?"
+@brickbrain ask_brickbrain "What is Unity Catalog?"
+@brickbrain ask_brickbrain "Show me Delta Live Tables example"
+```
+
+### Follow-up Questions (Automatic Context!)
+```
+@brickbrain ask_brickbrain "What is Unity Catalog?"
+@brickbrain ask_brickbrain "Tell me more about the governance features"
+@brickbrain ask_brickbrain "How does it compare to Hive metastore?"
+```
+
+✨ BrickBrain remembers your conversation for **30 minutes**!
+
+### Start Fresh Conversation
+```
+@brickbrain reset_conversation
+```
+
+---
+
+## 🎯 What Can BrickBrain Answer?
+
+| ✅ Covered Topics | ❌ Not Covered |
+|-------------------|----------------|
+| Delta Lake, DLT | General programming |
+| Unity Catalog | Non-Databricks topics |
+| Spark optimization | Real-time news/events |
+| MLflow workflows | Code debugging |
+| Structured Streaming | Personal data questions |
+| Data governance | |
+
+**Every answer includes:**
+- 📝 Expert explanations
+- 💻 Code examples  
+- 🔗 **Citations** (links to source blogs)
+- ⚡ Best practices
+
+---
+
+## ⚙️ Features
+
+| Feature | Details |
+|---------|---------|
+| 🧠 **Smart Context** | Remembers last 30 minutes of conversation |
+| 📚 **Citations** | All answers include source links |
+| ⚡ **Global Edge** | Fast responses from anywhere |
+| 🔒 **Secure** | Encrypted, authenticated |
+| 💰 **Free** | No cost to use |
+
+---
+
+## ⏱️ Response Times
+
+- **Typical**: 10-30 seconds
+- **Complex queries**: Up to 2 minutes
+
+💡 **Tip**: Be patient! BrickBrain searches through extensive blog content and uses LLMs to generate detailed, accurate answers.
+
+---
+
+## 🆘 Troubleshooting
+
+<details>
+<summary><strong>❓ "brickbrain" not appearing in Cursor?</strong></summary>
+
+1. Check `~/.cursor/mcp.json` is valid JSON (paste into JSONLint.com)
+2. **Restart Cursor completely** (Quit → Reopen, not just refresh)
+3. Verify `bash` and `curl` are installed (they should be by default on Mac/Linux)
+4. Check Cursor's MCP logs (Settings → Advanced → Show Logs)
+
+**Test the connection manually:**
+```bash
+# If using the script file approach:
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | ~/brickbrain-bridge.sh
+
+# Or test the server directly:
+curl -X POST https://brickbrain-mcp-bridge.get2jitesh.workers.dev/mcp \
+  -H "Content-Type: application/json" \
+  -H "x-mcp-key: 3eacb5a9b446c3507dfa5b84dc0e335a7c9f5e70801579ee9f35247fcd1c7369" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+Should return: `{"jsonrpc":"2.0","id":1,"result":{"tools":[...]}}`
+</details>
+
+<details>
+<summary><strong>⏳ Requests timing out?</strong></summary>
+
+- **Wait patiently** - complex questions take up to 2 minutes
+- Try simplifying: "What is Delta Lake?" instead of "Explain Delta Lake architecture, use cases, and optimization strategies in detail"
+- Check your internet connection
+- Verify the server is up:
+  ```bash
+  curl https://brickbrain-mcp-bridge.get2jitesh.workers.dev/
+  ```
+</details>
+
+<details>
+<summary><strong>🐛 Getting error messages?</strong></summary>
+
+**Test the server directly:**
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -H "x-mcp-key: 3eacb5a9b446c3507dfa5b84dc0e335a7c9f5e70801579ee9f35247fcd1c7369" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
+  https://brickbrain-mcp-bridge.get2jitesh.workers.dev/mcp
+```
+
+If this works but Cursor doesn't:
+- Problem is with your MCP configuration
+- Double-check the JSON formatting in `~/.cursor/mcp.json`
+- Make sure quotes and brackets match exactly
+
+If this fails:
+- Server might be down (rare)
+- Check your network/firewall settings
+</details>
+
+<details>
+<summary><strong>💻 Windows-specific issues?</strong></summary>
+
+Windows users may need to install bash:
+1. Use Git Bash (comes with Git for Windows)
+2. Or use WSL (Windows Subsystem for Linux)
+
+Alternatively, use Python instead:
+```json
+{
+  "mcpServers": {
+    "brickbrain": {
+      "command": "python",
+      "args": [
+        "-c",
+        "import sys,json,requests;[print(json.dumps(requests.post('https://brickbrain-mcp-bridge.get2jitesh.workers.dev/mcp',json=json.loads(l),headers={'x-mcp-key':'3eacb5a9b446c3507dfa5b84dc0e335a7c9f5e70801579ee9f35247fcd1c7369'},timeout=180).json()),flush=True) for l in sys.stdin if l.strip()]"
+      ]
+    }
+  }
+}
+```
+</details>
+
+---
+
+## 📝 Tips for Best Results
+
+1. **Be specific**: 
+   - ✅ "How do I optimize small Delta tables with frequent updates?"
+   - ❌ "optimization tips"
+
+2. **One topic at a time**: 
+   - ✅ Ask about Delta Lake, then Unity Catalog separately
+   - ❌ "Tell me about Delta Lake, Unity Catalog, and MLflow"
+
+3. **Use conversation context**:
+   - First: "What is Delta Lake?"
+   - Then: "What are its ACID properties?" (remembers we're talking about Delta Lake)
+
+4. **Reset between topics**:
+   - Use `reset_conversation` when switching to a completely different subject
+
+---
+
+## 🔐 Security & Privacy
+
+**Is it safe to use the shared MCP key?**
+
+✅ **Yes!** The key only allows:
+- Asking questions to BrickBrain
+- Reading publicly available blog content (Databricksters, Canadian Data Guy, AI on Databricks)
+
+❌ **Cannot**:
+- Access your private data
+- Modify any systems
+- See your Databricks workspaces
+- Access other users' conversations
+
+Each user's conversation is isolated by IP address.
+
+---
+
+## 📊 Data Sources
+
+BrickBrain searches curated content from:
+- 📰 **Databricksters** (Substack)
+- 📰 **Canadian Data Guy** (Substack)
+- 📰 **AI on Databricks** (Medium)
+
+All responses include **citations** linking back to original sources!
+
+---
+
+## 🔧 For Developers
+
+**Want to run your own instance?**
+
+<details>
+<summary>Click for deployment details</summary>
+
+**Tech Stack:**
+- Cloudflare Workers (serverless, global edge network)
+- MCP protocol over HTTP (JSON-RPC 2.0)
+- Bash bridge script (9 lines, zero dependencies)
+
+**Deploy your own:**
+```bash
+cd cloudflare-mcp-worker
+npm install
+npx wrangler deploy
+```
+
+**Required secrets:**
+```bash
+echo "YOUR_TOKEN" | npx wrangler secret put DATABRICKS_TOKEN
+echo "YOUR_KEY" | npx wrangler secret put MCP_SHARED_KEY
+echo "YOUR_ENDPOINT" | npx wrangler secret put DATABRICKS_SERVING_URL
+```
+
+**Architecture:** Cursor (stdio) → mcp-bridge.sh → Cloudflare Worker → Databricks Agent
+
+</details>
+
+---
+
+## 📮 Feedback & Support
+
+- **Issues?** [Open a GitHub issue](https://github.com/jiteshsoni/BrickBrain/issues)
+- **Questions?** Check the troubleshooting section above
+- **Contributions?** PRs welcome!
+
+---
+
+**Happy Learning with BrickBrain! 🎓✨**
