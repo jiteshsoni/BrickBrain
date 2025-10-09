@@ -4,39 +4,81 @@ Ask questions about Databricks, Spark, Delta Lake, MLflow, Unity Catalog, and da
 
 ---
 
-## ⚡ Quick Setup (2 minutes)
+## ⚡ Quick Setup (3 steps)
 
-### Step 1: Download the Bridge Script
+### Step 1: Create the Bridge Script
 
-**Mac/Linux:**
-```bash
-curl -o ~/brickbrain-bridge.sh https://raw.githubusercontent.com/jiteshsoni/BrickBrain/main/cloudflare-mcp-worker/mcp-bridge.sh
-chmod +x ~/brickbrain-bridge.sh
-```
-
-**Windows (Git Bash or WSL):**
-```bash
-curl -o ~/brickbrain-bridge.sh https://raw.githubusercontent.com/jiteshsoni/BrickBrain/main/cloudflare-mcp-worker/mcp-bridge.sh
-chmod +x ~/brickbrain-bridge.sh
-```
-
-### Step 2: Configure Cursor
-
-Create or edit `~/.cursor/mcp.json`:
+Copy and paste this command into your terminal:
 
 **Mac/Linux:**
 ```bash
-mkdir -p ~/.cursor
-nano ~/.cursor/mcp.json
+cat > ~/brickbrain-bridge.sh << 'EOF'
+#!/bin/bash
+set -e
+
+while IFS= read -r line; do
+  if [ -n "$line" ]; then
+    response=$(curl -s -w "\n%{http_code}" -X POST \
+      --max-time 180 \
+      -H "Content-Type: application/json" \
+      -H "x-mcp-key: 3eacb5a9b446c3507dfa5b84dc0e335a7c9f5e70801579ee9f35247fcd1c7369" \
+      -d "$line" \
+      https://brickbrain-mcp-bridge.get2jitesh.workers.dev/mcp)
+    
+    status_code=$(echo "$response" | tail -n 1)
+    body=$(echo "$response" | sed '$d')
+    
+    if [ -n "$body" ]; then
+      echo "$body"
+    fi
+  fi
+done
+EOF
+
+chmod +x ~/brickbrain-bridge.sh
 ```
 
-**Windows (PowerShell):**
-```powershell
-mkdir $env:USERPROFILE\.cursor -Force
-notepad $env:USERPROFILE\.cursor\mcp.json
+**Windows (Git Bash):**
+```bash
+cat > ~/brickbrain-bridge.sh << 'EOF'
+#!/bin/bash
+set -e
+
+while IFS= read -r line; do
+  if [ -n "$line" ]; then
+    response=$(curl -s -w "\n%{http_code}" -X POST \
+      --max-time 180 \
+      -H "Content-Type: application/json" \
+      -H "x-mcp-key: 3eacb5a9b446c3507dfa5b84dc0e335a7c9f5e70801579ee9f35247fcd1c7369" \
+      -d "$line" \
+      https://brickbrain-mcp-bridge.get2jitesh.workers.dev/mcp)
+    
+    status_code=$(echo "$response" | tail -n 1)
+    body=$(echo "$response" | sed '$d')
+    
+    if [ -n "$body" ]; then
+      echo "$body"
+    fi
+  fi
+done
+EOF
+
+chmod +x ~/brickbrain-bridge.sh
 ```
 
-Paste this configuration **(copy exactly as shown - no changes needed!)**:
+✅ This creates the script file and makes it executable.
+
+### Step 2: Add to Cursor Settings
+
+1. Open **Cursor Settings**: 
+   - Mac: `Cmd + ,` or Cursor → Settings
+   - Windows/Linux: `Ctrl + ,` or File → Preferences → Settings
+
+2. Search for **"mcp"** in the settings search bar
+
+3. Click **"Edit in mcp.json"** (or create `~/.cursor/mcp.json` if it doesn't exist)
+
+4. Paste this configuration:
 
 ```json
 {
@@ -49,41 +91,21 @@ Paste this configuration **(copy exactly as shown - no changes needed!)**:
 }
 ```
 
-**✅ That's it!** No username replacements needed - `~/` automatically points to your home directory.
-
-<details>
-<summary>🔧 Alternative: Inline Configuration (no separate file needed)</summary>
-
-If you prefer not to download a separate script, use this all-in-one config:
-
-```json
-{
-  "mcpServers": {
-    "brickbrain": {
-      "command": "bash",
-      "args": [
-        "-c",
-        "while IFS= read -r line; do [ -n \"$line\" ] && curl -s -X POST --max-time 180 -H 'Content-Type: application/json' -H 'x-mcp-key: 3eacb5a9b446c3507dfa5b84dc0e335a7c9f5e70801579ee9f35247fcd1c7369' -d \"$line\" https://brickbrain-mcp-bridge.get2jitesh.workers.dev/mcp; done"
-      ]
-    }
-  }
-}
-```
-
-This works but is harder to read and maintain.
-</details>
+5. Save the file
 
 ### Step 3: Restart Cursor
 
-Completely quit and reopen Cursor (not just refresh - fully quit and relaunch).
+Completely **quit and reopen Cursor** (not just reload - fully quit the app and restart).
 
-### Step 4: Start Using!
+### ✅ You're Ready!
+
+Try it out:
 
 ```
 @brickbrain ask_brickbrain "What is Delta Lake?"
 ```
 
-**That's it!** 🎉
+**That's it - 3 simple steps!** 🎉
 
 ---
 
