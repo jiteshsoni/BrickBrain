@@ -1,0 +1,35 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "brickbrain-mcp-bridge"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Cloudflare Workers AI models (optional, for future enhancements)
+# ai = { binding = "AI" }
+
+# Environment variables (non-sensitive)
+[vars]
+# DATABRICKS_SERVING_URL will be set via secret (see below)
+
+# Secrets (set via CLI):
+# wrangler secret put DATABRICKS_SERVING_URL
+# wrangler secret put DATABRICKS_TOKEN
+# wrangler secret put MCP_SHARED_KEY
+
+# Development server settings
+[dev]
+port = 8787
+
+# Custom route (optional - Cloudflare will assign you a workers.dev subdomain by default)
+# routes = [
+#   { pattern = "mcp.yourdomain.com", custom_domain = true }
+# ]
+
+# Build configuration
+[build]
+command = "npm run build"
+
+# Observability (optional)
+[observability]
+enabled = true
+
