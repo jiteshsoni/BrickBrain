@@ -20,14 +20,17 @@ compatibility_flags = ["nodejs_compat"]
 [dev]
 port = 8787
 
-# Custom route (optional - Cloudflare will assign you a workers.dev subdomain by default)
+# Workers.dev route (will be auto-assigned after subdomain registration)
+# If you have a custom domain, uncomment and modify:
 # routes = [
 #   { pattern = "mcp.yourdomain.com", custom_domain = true }
 # ]
 
-# Build configuration
-[build]
-command = "npm run build"
+# Temporary: Enable workers.dev deployment
+workers_dev = true
+
+# Build configuration (TypeScript is automatically compiled by Wrangler)
+# No custom build needed
 
 # Observability (optional)
 [observability]

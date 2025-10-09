@@ -1,12 +1,6 @@
-# Example environment variables for local development
-# Copy this file to .dev.vars and fill in your actual values
+# Local development environment variables
+# Copy to .dev.vars and fill in actual values
 
-# Your Databricks serving endpoint URL
 DATABRICKS_SERVING_URL=https://dbc-a657af2e-14d9.cloud.databricks.com/serving-endpoints/ka-1ff550b7-endpoint/invocations
-
-# Your Databricks Personal Access Token
 DATABRICKS_TOKEN=dapi_YOUR_TOKEN_HERE
-
-# Optional: Shared key for client authentication (generate with: openssl rand -hex 32)
-MCP_SHARED_KEY=your-super-secret-key-here
-
+MCP_SHARED_KEY=your-shared-key-here

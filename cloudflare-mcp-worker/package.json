@@ -21,7 +21,6 @@
   "author": "Jitesh Soni",
   "license": "MIT",
   "dependencies": {
-    "agents": "^0.1.0",
     "hono": "^4.0.0"
   },
   "devDependencies": {
