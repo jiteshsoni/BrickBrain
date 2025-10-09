@@ -116,7 +116,12 @@ try:
         pipeline_type="TRIGGERED",
         primary_key="id",
         embedding_source_column="content", # The column containing our text
-        embedding_model_endpoint_name="databricks-gte-large-en" # The embedding endpoint used to create the embeddings
+        embedding_model_endpoint_name="databricks-gte-large-en", # The embedding endpoint used to create the embeddings
+        columns=[
+            {"name": "primary_url", "doc_uri": True},  # For citations - links back to source
+            {"name": "content_type", "doc_uri": False},  # Metadata: blog or video
+            {"name": "domain", "doc_uri": False}  # Metadata: source domain
+        ]
     )
     print(f"✅ Index created successfully")
 except Exception as e:
