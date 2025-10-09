@@ -1,0 +1,20 @@
+# Blog Data Ingestion Configuration
+# Websites to scrape for blog content
+
+websites:
+  - https://www.canadiandataguy.com/
+  - https://www.databricksters.com/
+  - https://medium.com/@AI-on-Databricks
+
+# Chunking parameters
+chunk_size: 800
+chunk_overlap: 50
+
+# LLM model for content extraction
+llm_model: databricks-meta-llama-3-3-70b-instruct
+
+# Table names (can be overridden via widget parameters)
+default_tables:
+  raw_blog_content: dev.brickbrain.raw_blog_content
+  preprocessed_blogs: dev.brickbrain.preprocessed_blogs
+

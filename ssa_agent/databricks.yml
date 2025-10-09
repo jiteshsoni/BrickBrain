@@ -13,23 +13,31 @@ variables:
 
   blog_websites:
     description: "List of blog websites for bulk ingest"
-    default: "https://www.databricksters.com/,https://www.canadiandataguy.com/"
+    default: "https://www.databricksters.com/,https://www.canadiandataguy.com/,https://medium.com/@AI-on-Databricks"
   
   chunk_size:
     description: "Maximum tokens per chunk for content processing"
-    default: "500"
+    default: "800"
   
   chunk_overlap:
     description: "Overlapping tokens between chunks"
     default: "50"
   
   youtube_channel:
-    description: "YouTube channel name for video transcription"
+    description: "Primary YouTube channel name for video transcription"
     default: "databricks"
   
   max_videos:
-    description: "Maximum number of videos to process per channel"
-    default: "5"
+    description: "Maximum number of videos to process from primary channel"
+    default: "2"
+  
+  youtube_channel_2:
+    description: "Second YouTube channel name for video transcription"
+    default: "CanadianDataGuy"
+  
+  max_videos_2:
+    description: "Maximum number of videos to process from second channel"
+    default: "1000"
   
   vector_search_endpoint:
     description: "Vector search endpoint name"
@@ -49,7 +57,7 @@ variables:
 
 
 include:
-  - ./resources/*.yml
+  - ./_resources/*.yml
 
 
 targets:
@@ -59,10 +67,12 @@ targets:
     workspace:
       host: ""
     variables:
-      uc_catalog: "dev_catalog"
+      uc_catalog: "brickbrain"
       schema: "brickbrain_dev"
-      blog_websites: "https://www.databricksters.com/"
+      blog_websites: "https://www.databricksters.com/,https://www.canadiandataguy.com/,https://medium.com/@AI-on-Databricks"
       max_videos: "2"
+      youtube_channel_2: "CanadianDataGuy"
+      max_videos_2: "50"
       experiment_name: "brickbrain_dev_experiment"
       registered_model: "brickbrain_dev_agent"
 
@@ -71,10 +81,11 @@ targets:
     workspace: 
       host: "" 
     variables:
-      uc_catalog: "veena_ramesh_test"
-      schema: "data"
-      blog_websites: "https://www.databricksters.com/,https://www.canadiandataguy.com/"
-      max_videos: "5"
+      uc_catalog: "brickbrain"
+      schema: "brickbrain_stg"
+      blog_websites: "https://www.databricksters.com/,https://www.canadiandataguy.com/,https://medium.com/@AI-on-Databricks"
+      max_videos: "2"
+      max_videos_2: "100"
       experiment_name: "brickbrain_experiment"
       registered_model: "brickbrain_agent"
 
@@ -83,9 +94,10 @@ targets:
     workspace:
       host: "" 
     variables:
-      uc_catalog: "main"
-      schema: "brickbrain"
-      blog_websites: "https://www.databricksters.com/,https://www.canadiandataguy.com/,https://medium.com/data-engineer-things/"
-      max_videos: "20"
+      uc_catalog: "brickbrain"
+      schema: "brickbrain_prod"
+      blog_websites: "https://www.databricksters.com/,https://www.canadiandataguy.com/,https://medium.com/@AI-on-Databricks"
+      max_videos: "5"
+      max_videos_2: "1000"
       experiment_name: "brickbrain_prod_experiment"
       registered_model: "brickbrain_prod_agent"

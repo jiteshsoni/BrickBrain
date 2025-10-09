@@ -1,5 +1,8 @@
 # Databricks notebook source
 # MAGIC %pip install -qqqq databricks-vectorsearch
+
+# COMMAND ----------
+
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -37,50 +40,32 @@ print(f"Number of Source Tables: {len(source_tables)}")
 
 # COMMAND ----------
 
-# DBTITLE 1, Enforce source tables are same schema 
-from pyspark.sql.types import StructType, StructField, LongType, StringType
-
-SCHEMA = StructType([
-    StructField('id', LongType(), False),  # False = not nullable (identity column)
-    StructField('chunk_id', LongType(), True),  
-    StructField('primary_url', StringType(), True),
-    StructField('content_type', StringType(), True),
-    StructField('domain', StringType(), True),
-    StructField('content', StringType(), True)
-])
-
-def enforce_schema(source_tables):
-    for table in source_tables:
-        df = spark.table(table)
-        if df.schema != SCHEMA:
-            raise ValueError(f"Table {table} schema does not match expected schema")
+# DBTITLE 1, Union source tables and add unique IDs
+from pyspark.sql import functions as F
 
 def union_source_tables(source_tables):
-    df = spark.createDataFrame([], SCHEMA)
-    for table in source_tables:
-        df = df.unionAll(spark.table(table))
-    return df
-
-def create_delta_table(preprocessed_data_table):
-    if not spark.catalog.tableExists(f"{preprocessed_data_table}") or spark.table(f"{preprocessed_data_table}").isEmpty():
-        spark.sql(f"""
-        CREATE TABLE IF NOT EXISTS {preprocessed_data_table} (
-            id BIGINT GENERATED ALWAYS AS IDENTITY,
-            chunk_id BIGINT,
-            primary_url STRING,
-            content_type STRING, 
-            domain STRING, 
-            content STRING
-        )
-        TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')
-        """)
+    """Union all source tables by name and add a unique ID column."""
+    # Start with the first table
+    combined_df = spark.table(source_tables[0])
+    
+    # Union with remaining tables by name (handles column ordering automatically)
+    for table in source_tables[1:]:
+        combined_df = combined_df.unionByName(spark.table(table), allowMissingColumns=True)
+    
+    # Add unique ID column using monotonically_increasing_id
+    combined_df = combined_df.withColumn("id", F.monotonically_increasing_id())
+    
+    return combined_df
 
 # COMMAND ----------
 
-enforce_schema(source_tables)
 combined_df = union_source_tables(source_tables)
-create_delta_table(preprocessed_data_table)
-combined_df.write.mode('overwrite').saveAsTable(preprocessed_data_table)
+
+# Write to Delta table with Change Data Feed enabled
+combined_df.write \
+    .mode('overwrite') \
+    .option('delta.enableChangeDataFeed', 'true') \
+    .saveAsTable(preprocessed_data_table)
 
 # COMMAND ----------
 
@@ -104,14 +89,26 @@ print(f"Endpoint named {vector_search_endpoint} is ready.")
 
 # COMMAND ----------
 
-# DBTITLE 1,Create Index
+# DBTITLE 1,Drop and Recreate Index
 from databricks.sdk import WorkspaceClient
 import databricks.sdk.service.catalog as c
 
+# Drop existing index if it exists (since we're doing full overwrite of source table)
 try:
+    print(f"🗑️  Checking for existing index {vector_search_index}...")
     existing_index = vsc.get_index(vector_search_endpoint, vector_search_index)
-    existing_index.sync()
-except Exception:
+    print(f"📍 Found existing index, deleting it...")
+    vsc.delete_index(vector_search_index)
+    print(f"✅ Existing index deleted")
+except Exception as e:
+    if "does not exist" in str(e).lower() or "not found" in str(e).lower():
+        print(f"ℹ️  No existing index to delete")
+    else:
+        print(f"⚠️  Error checking/deleting index: {str(e)[:200]}")
+
+# Create fresh index
+print(f"🆕 Creating fresh index {vector_search_index}...")
+try:
     vsc.create_delta_sync_index(
         endpoint_name=vector_search_endpoint,
         index_name=vector_search_index,
@@ -121,6 +118,13 @@ except Exception:
         embedding_source_column="content", # The column containing our text
         embedding_model_endpoint_name="databricks-gte-large-en" # The embedding endpoint used to create the embeddings
     )
+    print(f"✅ Index created successfully")
+except Exception as e:
+    # Rare race condition: index was created between delete and create
+    if "RESOURCE_ALREADY_EXISTS" in str(e):
+        print(f"⚠️  Index already exists (concurrent creation), will use existing index")
+    else:
+        raise
 
 # COMMAND ----------
 

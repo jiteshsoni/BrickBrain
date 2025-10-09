@@ -29,3 +29,4 @@ resources:
     brickbrain_chatapp:
       name: ${bundle.target}-brickbrain-chatapp
       description: "BrickBrain Streamlit chat interface"
+      source_code_path: ${workspace.file_path}/chatapp/app

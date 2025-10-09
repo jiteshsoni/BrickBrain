@@ -23,29 +23,45 @@ resources:
               preprocessed_blogs_table: ${var.uc_catalog}.${var.schema}.preprocessed_blogs
               chunk_size: ${var.chunk_size}
               chunk_overlap: ${var.chunk_overlap}
+              llm_model: "databricks-meta-llama-3-3-70b-instruct"
               git_source_info: "url:${bundle.git.origin_url}; branch:${bundle.git.branch}; commit:${bundle.git.commit}"
 
-        - task_key: VideoDataIngestion
-          notebook_task:
-            notebook_path: ../agent/retriever_tool/data_ingestion/video_data/notebooks/DataIngestion.py
-            base_parameters:
-              bundle_root: ${workspace.file_path}
-              channel_name: ${var.youtube_channel}
-              max_videos: ${var.max_videos}
-              max_workers: 5 
-              raw_youtube_content_table: ${var.uc_catalog}.${var.schema}.raw_youtube_content
-              preprocessed_youtube_content_table: ${var.uc_catalog}.${var.schema}.preprocessed_youtube_content
-              git_source_info: "url:${bundle.git.origin_url}; branch:${bundle.git.branch}; commit:${bundle.git.commit}"
+        # YouTube tasks temporarily disabled for testing
+        # - task_key: VideoDataIngestion_Databricks
+        #   notebook_task:
+        #     notebook_path: ../agent/retriever_tool/data_ingestion/video_data/notebooks/DataIngestion.py
+        #     base_parameters:
+        #       bundle_root: ${workspace.file_path}
+        #       channel_name: ${var.youtube_channel}
+        #       max_videos: ${var.max_videos}
+        #       max_workers: 5 
+        #       raw_youtube_content_table: ${var.uc_catalog}.${var.schema}.raw_youtube_content_databricks
+        #       preprocessed_youtube_content_table: ${var.uc_catalog}.${var.schema}.preprocessed_youtube_content
+        #       git_source_info: "url:${bundle.git.origin_url}; branch:${bundle.git.branch}; commit:${bundle.git.commit}"
+
+        # - task_key: VideoDataIngestion_CanadianDataGuy
+        #   notebook_task:
+        #     notebook_path: ../agent/retriever_tool/data_ingestion/video_data/notebooks/DataIngestion.py
+        #     base_parameters:
+        #       bundle_root: ${workspace.file_path}
+        #       channel_name: ${var.youtube_channel_2}
+        #       max_videos: ${var.max_videos_2}
+        #       max_workers: 5 
+        #       raw_youtube_content_table: ${var.uc_catalog}.${var.schema}.raw_youtube_content_canadiandataguy
+        #       preprocessed_youtube_content_table: ${var.uc_catalog}.${var.schema}.preprocessed_youtube_content
+        #       git_source_info: "url:${bundle.git.origin_url}; branch:${bundle.git.branch}; commit:${bundle.git.commit}"
 
         - task_key: VectorSearchIngestion
           depends_on:
               - task_key: BlogDataIngestion
-              - task_key: VideoDataIngestion
+              # YouTube tasks disabled for testing
+              # - task_key: VideoDataIngestion_Databricks
+              # - task_key: VideoDataIngestion_CanadianDataGuy
           notebook_task:
             notebook_path: ../agent/retriever_tool/vector_search/notebooks/VectorSearchIngestion.py
             base_parameters:
               vector_search_endpoint: ${var.vector_search_endpoint}
               vector_search_index: ${var.uc_catalog}.${var.schema}.brickbrain_index
               preprocessed_data_table: ${var.uc_catalog}.${var.schema}.brickbrain_delta_table
-              source_tables: "${var.uc_catalog}.${var.schema}.preprocessed_blogs,${var.uc_catalog}.${var.schema}.preprocessed_youtube_content"
+              source_tables: "${var.uc_catalog}.${var.schema}.preprocessed_blogs"
               git_source_info: "url:${bundle.git.origin_url}; branch:${bundle.git.branch}; commit:${bundle.git.commit}"

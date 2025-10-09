@@ -41,6 +41,31 @@ print(f"Max videos: {max_videos}")
 print(f"Raw table: {raw_youtube_content_table}")
 print(f"Preprocessed table: {preprocessed_youtube_content_table}")
 
+# Extract catalog and schema from table name and create both if not exists
+table_parts = raw_youtube_content_table.split('.')
+if len(table_parts) >= 2:
+    catalog = table_parts[0]
+    schema = table_parts[1]
+    
+    # Create catalog first
+    try:
+        print(f"Creating catalog if not exists: {catalog}")
+        spark.sql(f"CREATE CATALOG IF NOT EXISTS {catalog}")
+        print(f"✅ Catalog {catalog} is ready")
+    except Exception as e:
+        print(f"⚠️  Could not create catalog (may already exist): {str(e)[:200]}")
+    
+    # Then create schema
+    try:
+        print(f"Creating schema if not exists: {catalog}.{schema}")
+        spark.sql(f"CREATE SCHEMA IF NOT EXISTS {catalog}.{schema}")
+        print(f"✅ Schema {catalog}.{schema} is ready")
+    except Exception as e:
+        print(f"⚠️  Could not create schema (may already exist): {str(e)[:200]}")
+        print(f"   Proceeding...")
+else:
+    print("Warning: Could not extract catalog.schema from table name")
+
 # COMMAND ----------
 
 import sys
@@ -48,7 +73,7 @@ import os
 import logging
 from typing import List, Dict
 
-sys.path.append(bundle_root)
+sys.path.append(os.path.join(bundle_root, "agent"))
 
 from retriever_tool.data_ingestion.video_data.utils import YouTubeClient, TranscriptClient, TranscriptCleaner
 

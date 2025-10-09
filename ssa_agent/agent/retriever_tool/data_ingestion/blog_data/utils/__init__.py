@@ -2,10 +2,10 @@
 Helper utilities for Substack blog data ingestion.
 """
 
-from .blog_scraper import BlogScraper
+from .blog_scraper import scrape_blogs
 from .chunking import Chunker
 
 __all__ = [
-    'BlogScraper',
+    'scrape_blogs',
     'Chunker',
 ]
