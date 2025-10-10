@@ -7,17 +7,15 @@
 ########################################################################################################################
 # Blog Scraper Data Ingestion Pipeline
 # 
-# This pipeline scrapes blog content and chunks it for vector search.
-# Each blog post is converted to markdown.
+# This pipeline scrapes blog content and extracts it using LLM.
+# Each blog post is converted to markdown and then cleaned by LLM.
 #
 # inputs: 
 # - bundle_root: path to the bundle root
 # - websites: comma-separated list of websites to scrape
 # - raw_blog_content_table: name of the delta table to save the markdown data to
-# - preprocessed_blogs_table: name of the delta table to save the chunked data to
-# - chunk_size: maximum tokens per chunk (default: 500)
-# - chunk_overlap: overlapping tokens between chunks (default: 50)
 #
+# Note: AI extraction and chunking are handled by the ChunkingTask notebook
 ########################################################################################################################
 
 # COMMAND ----------
@@ -25,9 +23,17 @@
 bundle_root = dbutils.widgets.get("bundle_root")
 websites = dbutils.widgets.get("websites")
 raw_blog_content_table = dbutils.widgets.get("raw_blog_content_table")
-preprocessed_blogs_table = dbutils.widgets.get("preprocessed_blogs_table")
-chunk_size = int(dbutils.widgets.get("chunk_size") or "500")
-chunk_overlap = int(dbutils.widgets.get("chunk_overlap") or "50")
+
+# Validate required parameters
+assert bundle_root, "Bundle root is required"
+assert websites, "Websites parameter is required"
+assert raw_blog_content_table, "Raw blog content table is required"
+
+print(f"Bundle root: {bundle_root}")
+print(f"Websites: {websites}")
+print(f"Raw table: {raw_blog_content_table}")
+
+# Note: Catalog and schema should be created via setup_brickbrain_workspace.py before running this notebook
 
 # COMMAND ----------
 
@@ -38,9 +44,10 @@ from typing import List, Dict, Any
 import uuid
 from datetime import datetime
 
-sys.path.append(bundle_root)
+sys.path.append(os.path.join(bundle_root, "agent"))
 
-from retriever_tool.data_ingestion.blog_data.utils import scrape_blogs, Chunker
+# Note: Chunker is not imported here as chunking is handled by separate ChunkingTask notebook
+from retriever_tool.data_ingestion.blog_data.utils.blog_scraper import GetBlogs, BlogContentScraper
 
 from pyspark.sql.functions import col, explode, pandas_udf, lit, expr
 from pyspark.sql.types import StringType, ArrayType, StructType, StructField
@@ -52,59 +59,146 @@ logger = logging.getLogger(__name__)
 
 # COMMAND ----------
 
-df = scrape_blogs(websites, spark)
-df.write.mode('overwrite').saveAsTable(raw_blog_content_table)
+# Discover all blog URLs from websites
+discoverer = GetBlogs(websites)
+all_urls = discoverer.discover_all_posts()
 
-# COMMAND ----------
+if not all_urls:
+    logger.warning("No URLs discovered")
+    dbutils.notebook.exit("No URLs discovered from websites")
 
-blogs = spark.sql(f"select * from {raw_blog_content_table}")
+print(f"Discovered {len(all_urls)} blog URLs from websites")
 
-prompt = """
-Please analyze the following blog post and extract all of the EXACT phrases used for the technical content. Keep all of the technical information written exactly, and ignore all filler content (like jokes, introductions, and advertisements). 
+# Check for existing blogs to implement incremental ingestion
+existing_urls = set()
+try:
+    print(f"Checking for existing blogs in {raw_blog_content_table}...")
+    existing_df = spark.table(raw_blog_content_table)
+    
+    # Get all existing URLs
+    url_rows = existing_df.select(col("url")).distinct().collect()
+    existing_urls = set(row.url for row in url_rows if row.url)
+    
+    print(f"✅ Found {len(existing_urls)} unique blogs already in table.")
+except Exception as e:
+    print(f"Table {raw_blog_content_table} does not exist or is empty. Will create new table.")
+    print(f"Details: {str(e)[:200]}")
 
-Instructions:
-1. Extract technical content exactly as is. 
-2. Preserve EXISTING examples and technical procedures. Put code quotes around code. 
-3. Remove all filtered or unnecessary content that is not useable for search. 
-4. Do not insert any content. 
+# Filter out already scraped blogs
+new_urls = []
+skipped_urls = []
 
-Output format in Markdown. 
+for url in all_urls:
+    if url in existing_urls:
+        skipped_urls.append(url)
+    else:
+        new_urls.append(url)
 
-Blog post:
-"""
+print(f"\n{'='*80}")
+print(f"📊 Blog Ingestion Summary")
+print(f"{'='*80}")
+print(f"Total blogs discovered from websites: {len(all_urls)}")
+print(f"  ✅ Already parsed (will skip):      {len(skipped_urls)}")
+print(f"  🆕 New blogs (will scrape):         {len(new_urls)}")
+print(f"{'='*80}\n")
 
-blogs_extracted = (
-    blogs
-    .withColumn("extracted_content", expr(f"ai_query('databricks-meta-llama-3-3-70b-instruct', concat('{prompt}', markdown_content))")
-    ) 
-)
+# Show skipped blogs in detail
+if skipped_urls:
+    print(f"⏭️  Already Parsed Blogs ({len(skipped_urls)} total) - SKIPPING:")
+    print(f"{'-'*80}")
+    for i, url in enumerate(skipped_urls, 1):
+        print(f"  {i}. {url}")
+    print(f"{'-'*80}\n")
 
-# COMMAND ----------
+# Show new blogs to fetch in detail
+if new_urls:
+    print(f"🆕 New Blogs to Scrape ({len(new_urls)} total):")
+    print(f"{'-'*80}")
+    for i, url in enumerate(new_urls, 1):
+        print(f"  {i}. {url}")
+    print(f"{'-'*80}\n")
 
-from pyspark.sql import functions as F
-from pyspark.sql.types import ArrayType, StringType
-import pandas as pd
+if len(new_urls) == 0:
+    print("\n✅ No new blogs to scrape. All discovered blogs are up to date.")
+    # Don't exit - we'll check if existing blogs need preprocessing later
 
-chunker = Chunker(max_chunk_size=800, chunk_overlap=50)
+# Only scrape new URLs if we have any
+if len(new_urls) > 0:
+    print(f"🔄 Starting to scrape {len(new_urls)} new blogs...\n")
+    scraper = BlogContentScraper()
+    results = scraper.scrape_multiple(new_urls)
+    print(f"\n✅ Scraping completed!")
 
-@pandas_udf(ArrayType(StringType()))
-def parse_and_split(content: pd.Series) -> pd.Series:
-    """Chunk blog content and add summaries."""
-    return content.apply(lambda text: chunker.chunk_document(text)) 
+    # Create DataFrame from results
+    from pyspark.sql.types import StructType, StructField, StringType
 
-final_df = blogs_extracted.select(
-    F.posexplode(parse_and_split(
-        F.col('extracted_content'), 
-    )).alias('chunk_id', 'content'), 
-    "domain", 
-    "url"
-).withColumn(
-    "content_type", 
-    F.lit("blog")
-).withColumnRenamed(
-    "url", 
-    "primary_url"
-)
+    schema = StructType([
+        StructField("url", StringType(), True),
+        StructField("title", StringType(), True),
+        StructField("markdown_content", StringType(), True),
+        StructField("domain", StringType(), True)
+    ])
 
-final_df.write.mode('overwrite').saveAsTable(preprocessed_blogs_table)
-final_df.display()
+    blog_posts_data = []
+    failed_scrapes = []
+
+    for result in results:
+        if result['success']:
+            row = {
+                "url": result['metadata']['url'],
+                "title": result['metadata']['title'],
+                "markdown_content": result['content'],
+                "domain": result['metadata']['domain'],
+            }
+            blog_posts_data.append(row)
+        else:
+            failed_scrapes.append({
+                'url': result['metadata']['url'],
+                'error': result['metadata'].get('error', 'Unknown error')
+            })
+
+    # Log scraping results
+    print(f"\n{'='*80}")
+    print(f"📊 Scraping Results")
+    print(f"{'='*80}")
+    print(f"  ✅ Successfully scraped: {len(blog_posts_data)}/{len(new_urls)}")
+    print(f"  ❌ Failed to scrape:     {len(failed_scrapes)}/{len(new_urls)}")
+    print(f"{'='*80}\n")
+
+    if failed_scrapes:
+        print(f"⚠️  Failed Scrapes ({len(failed_scrapes)} total):")
+        print(f"{'-'*80}")
+        for i, fail in enumerate(failed_scrapes, 1):
+            print(f"  {i}. {fail['url']}")
+            print(f"     Error: {fail['error'][:100]}")
+        print(f"{'-'*80}\n")
+
+    logger.info(f"Successfully scraped {len(blog_posts_data)} out of {len(new_urls)} new posts")
+
+    if not blog_posts_data:
+        print("⚠️  All scraping attempts failed for new blogs")
+        blog_posts_data = []  # Empty list, will skip to reading raw table
+    else:
+        df = spark.createDataFrame(blog_posts_data, schema)
+
+        # Always use append mode for raw data ingestion
+        # If table doesn't exist, Spark will create it automatically
+        # Manual intervention required for schema changes or table recreation
+        print(f"Writing {len(blog_posts_data)} new blogs in append mode")
+
+        df.write.mode('append').saveAsTable(raw_blog_content_table)
+
+        # Display current table stats
+        current_df = spark.table(raw_blog_content_table)
+        print(f"✅ Total blogs in table: {current_df.count()}")
+else:
+    print("⏭️  Skipping scraping - no new blogs to fetch")
+    blog_posts_data = []
+
+print(f"\n{'='*80}")
+print(f"✅ Blog Ingestion Complete")
+print(f"{'='*80}")
+print(f"Blogs stored in: {raw_blog_content_table}")
+print(f"Total blogs in raw table: {spark.table(raw_blog_content_table).count()}")
+print(f"\nℹ️  Note: AI extraction and chunking will be performed by ChunkingTask")
+print(f"{'='*80}\n")
