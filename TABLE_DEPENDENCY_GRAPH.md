@@ -37,24 +37,28 @@ External Sources
     │                               │
     └───────────────┬───────────────┘
                     │
-                    ├─── preprocessed_content (OVERWRITE)
-                    │       │
-                    │       ▼
-                    └─── preprocessed_content_chunked (OVERWRITE)
-                            │
-                            ▼
-                    [Task: VectorSearchIngestion]
-                            │
-                            ├─── brickbrain_delta_table (OVERWRITE, with CDF enabled)
-                            │       │
-                            │       ▼
-                            └─── brickbrain_index (Vector Search Index - Delta Sync)
-                                    │
-                                    ▼
-                            [Task: KnowledgeAssistantSync]
-                                    │
-                                    ▼
-                            Knowledge Assistant (synced)
+                    ▼
+            preprocessed_content (OVERWRITE)
+                    │
+                    │ (in-memory processing)
+                    ▼
+            preprocessed_content_chunked (OVERWRITE)
+                    │
+                    ▼
+            [Task: VectorSearchIngestion]
+                    │
+                    ▼
+            brickbrain_delta_table (OVERWRITE, with CDF enabled)
+                    │
+                    │ (source table for index)
+                    ▼
+            brickbrain_index (Vector Search Index - Delta Sync)
+                    │
+                    ▼
+            [Task: KnowledgeAssistantSync]
+                    │
+                    ▼
+            Knowledge Assistant (synced)
 ```
 
 ---
@@ -191,19 +195,22 @@ External Sources → [VideoDataIngestion_*] → raw_youtube_content (APPEND)
 ### Stage 2: Preprocessing & Chunking (Full Refresh)
 ```
 raw_blog_content + raw_youtube_content → [ChunkingTask] → 
-    ├─ preprocessed_content (OVERWRITE)
-    └─ preprocessed_content_chunked (OVERWRITE)
+    preprocessed_content (OVERWRITE)
+        ↓ (in-memory processing)
+    preprocessed_content_chunked (OVERWRITE)
 ```
 - **Idempotency**: Full deterministic reprocessing of all raw data
 - **Write Mode**: OVERWRITE (ensures no duplicates)
 - **When**: After any new data is added to raw tables
-- **Processing**: AI extraction + chunking
+- **Processing**: AI extraction + chunking (sequential stages)
+- **Key**: preprocessed_content is written first, then immediately used in-memory for chunking
 
 ### Stage 3: Vector Search Indexing (Full Refresh + Delta Sync)
 ```
 preprocessed_content_chunked → [VectorSearchIngestion] → 
-    ├─ brickbrain_delta_table (OVERWRITE with CDF)
-    └─ brickbrain_index (Delta Sync from CDF)
+    brickbrain_delta_table (OVERWRITE with CDF)
+        ↓ (source table for index)
+    brickbrain_index (Delta Sync from CDF)
 ```
 - **Idempotency**: 
   - Table overwrite ensures deterministic output
@@ -211,7 +218,8 @@ preprocessed_content_chunked → [VectorSearchIngestion] →
   - Delta sync only processes changes
 - **Write Mode**: OVERWRITE (table), SYNC (index)
 - **When**: After chunking completes
-- **Processing**: ID generation + vector embedding
+- **Processing**: ID generation → Delta table write → Vector index sync
+- **Key**: brickbrain_delta_table is the source table for brickbrain_index
 
 ### Stage 4: Knowledge Assistant Sync
 ```
