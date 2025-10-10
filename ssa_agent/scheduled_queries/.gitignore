@@ -1,0 +1,8 @@
+# Databricks bundle generated files
+.databricks/
+
+# Terraform state
+*.tfstate
+*.tfstate.backup
+.terraform/
+
