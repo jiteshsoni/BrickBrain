@@ -1,9 +1,0 @@
-requests
-beautifulsoup4
-html2text
-lxml
-urllib3
-feedparser
-databricks-connect
-transformers
-langchain-text-splitters

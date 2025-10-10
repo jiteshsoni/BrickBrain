@@ -25,11 +25,11 @@ variables:
   
   youtube_channel:
     description: "Primary YouTube channel name for video transcription"
-    default: "databricks"
+    default: "DustinVannoy"
   
   max_videos:
     description: "Maximum number of videos to process from primary channel"
-    default: "2"
+    default: "1000"
   
   youtube_channel_2:
     description: "Second YouTube channel name for video transcription"
@@ -42,6 +42,10 @@ variables:
   vector_search_endpoint:
     description: "Vector search endpoint name"
     default: "brickbrain"
+  
+  knowledge_assistant_id:
+    description: "Knowledge Assistant ID for syncing after vector index updates"
+    default: "1ff550b7-4fc9-4692-aa7c-e57e22e40076"
   
   experiment_name:
     description: "MLflow experiment name"
@@ -69,10 +73,6 @@ targets:
     variables:
       uc_catalog: "brickbrain"
       schema: "brickbrain_dev"
-      blog_websites: "https://www.databricksters.com/,https://www.canadiandataguy.com/,https://medium.com/@AI-on-Databricks"
-      max_videos: "2"
-      youtube_channel_2: "CanadianDataGuy"
-      max_videos_2: "50"
       experiment_name: "brickbrain_dev_experiment"
       registered_model: "brickbrain_dev_agent"
 
@@ -83,9 +83,6 @@ targets:
     variables:
       uc_catalog: "brickbrain"
       schema: "brickbrain_stg"
-      blog_websites: "https://www.databricksters.com/,https://www.canadiandataguy.com/,https://medium.com/@AI-on-Databricks"
-      max_videos: "2"
-      max_videos_2: "100"
       experiment_name: "brickbrain_experiment"
       registered_model: "brickbrain_agent"
 
@@ -96,8 +93,5 @@ targets:
     variables:
       uc_catalog: "brickbrain"
       schema: "brickbrain_prod"
-      blog_websites: "https://www.databricksters.com/,https://www.canadiandataguy.com/,https://medium.com/@AI-on-Databricks"
-      max_videos: "5"
-      max_videos_2: "1000"
       experiment_name: "brickbrain_prod_experiment"
       registered_model: "brickbrain_prod_agent"
