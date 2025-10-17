@@ -1,0 +1,62 @@
+resources:
+  jobs:
+    scheduled_brickbrain_query:
+      name: "Scheduled BrickBrain Query - Spark Streaming Best Practices"
+      description: |
+        Automated notebook that queries the BrickBrain Knowledge Assistant 
+        about Spark Streaming best practices every 25 minutes.
+        
+        Questions asked:
+        1. General Spark streaming best practices
+        2. Top 5 best practices to save money
+        3. Top 5 best practices for operational excellence
+        
+        This demonstrates:
+        - Scheduled Knowledge Agent queries with multiple questions
+        - MCP/Agent integration
+        - Periodic knowledge checks
+      
+      # Schedule: Run every 25 minutes
+      schedule:
+        quartz_cron_expression: "0 0/25 * * * ?"
+        timezone_id: "America/Los_Angeles"
+        pause_status: "UNPAUSED"
+      
+      # Job configuration
+      max_concurrent_runs: 1
+      timeout_seconds: 600  # 10 minutes timeout
+      
+      # Notification settings (optional)
+      email_notifications:
+        on_failure:
+          - "jitesh.soni@databricks.com"
+      
+      # Tasks
+      tasks:
+        - task_key: "query_brickbrain"
+          description: "Query BrickBrain Knowledge Assistant about Spark Streaming best practices (3 questions)"
+          
+          # Notebook configuration
+          notebook_task:
+            notebook_path: "${workspace.file_path}/notebooks/ScheduledBrickBrainQuery"
+            source: "WORKSPACE"
+          
+          # Compute configuration
+          # Using serverless compute for cost-efficiency
+          environments:
+            - environment_key: "default"
+              spec:
+                client: "1"
+          
+          # Retry configuration
+          timeout_seconds: 600
+          max_retries: 2
+          min_retry_interval_millis: 60000  # 1 minute
+
+      # Job-level tags
+      tags:
+        environment: "production"
+        purpose: "knowledge_agent_monitoring"
+        frequency: "every_20_minutes"
+        project: "brickbrain"
+
