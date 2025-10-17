@@ -51,7 +51,18 @@ class YouTubeClient:
             
         return None
     
-    def get_channel_videos(self, channel_id: str, max_results: int = 50) -> List[Dict]:
+    def get_channel_videos(self, channel_id: str, max_results: int = 50, published_after: Optional[str] = None) -> List[Dict]:
+        """
+        Fetch videos from a YouTube channel.
+        
+        Args:
+            channel_id: YouTube channel ID
+            max_results: Maximum number of videos to fetch
+            published_after: ISO 8601 date string (YYYY-MM-DD) to filter videos published after this date
+        
+        Returns:
+            List of video metadata dictionaries
+        """
         videos = []
         next_page_token = None
         
@@ -68,6 +79,14 @@ class YouTubeClient:
                 'type': 'video',
                 'maxResults': results_needed
             }
+            
+            # Add date filter if provided (format: YYYY-MM-DDTHH:MM:SSZ)
+            if published_after:
+                # Convert YYYY-MM-DD to RFC 3339 format required by YouTube API
+                if 'T' not in published_after:
+                    published_after = f"{published_after}T00:00:00Z"
+                params['publishedAfter'] = published_after
+                logger.info(f"Filtering videos published after: {published_after}")
             
             if next_page_token:
                 params['pageToken'] = next_page_token

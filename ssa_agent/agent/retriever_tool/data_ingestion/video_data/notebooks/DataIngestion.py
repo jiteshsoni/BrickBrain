@@ -6,15 +6,24 @@
 
 ########################################################################################################################
 # Video Transcription Data Ingestion Pipeline
-# 
-# inputs: 
-# - bundle_root: path to the bundle root
-# - channel_name: name of the channel to fetch videos from
-# - max_videos: maximum number of videos to fetch
-# - max_workers: maximum number of workers to use for transcription
-# - delay: delay between requests
-# - raw_data_table: name of the table to save the data to
 #
+# Widget Parameters:
+# - bundle_root: path to the bundle root
+# - channel_name: name of the YouTube channel to fetch videos from
+# - max_videos: maximum number of videos to fetch from the channel
+# - published_after: (optional) fetch only videos published after this date (YYYY-MM-DD format, empty for all)
+# - raw_youtube_content_table: Unity Catalog table name for raw video data with transcriptions
+#
+# Databricks Secrets (required):
+# - youtube_api_key: YouTube Data API v3 key
+# - webshare_proxy_username: Proxy username for transcript API
+# - webshare_proxy_password: Proxy password for transcript API
+#
+# Features:
+# - Incremental ingestion: Only scrapes new videos, skips existing ones
+# - Parallel transcription fetching (5 workers)
+#
+# Note: AI extraction and chunking are handled by the ChunkingTask notebook
 ########################################################################################################################
 
 # COMMAND ----------
@@ -22,33 +31,39 @@
 bundle_root = dbutils.widgets.get("bundle_root")
 channel_name = dbutils.widgets.get("channel_name")
 max_videos = int(dbutils.widgets.get("max_videos")) 
-max_workers = 5 
+max_workers = 5  # Number of parallel workers for transcription
+published_after = dbutils.widgets.get("published_after") or None  # Optional date filter
 webshare_proxy_username = dbutils.secrets.get(scope="brickbrain_ssa_agent_scope", key="webshare_proxy_username")
 webshare_proxy_password = dbutils.secrets.get(scope="brickbrain_ssa_agent_scope", key="webshare_proxy_password") 
 youtube_api_key = dbutils.secrets.get(scope="brickbrain_ssa_agent_scope", key="youtube_api_key")
 raw_youtube_content_table = dbutils.widgets.get("raw_youtube_content_table")
-preprocessed_youtube_content_table = dbutils.widgets.get("preprocessed_youtube_content_table")
 
 assert bundle_root, "Bundle root is required"
 assert channel_name, "Channel name is required"
 assert max_videos, "Max videos is required"
 assert raw_youtube_content_table, "Raw youtube content table is required"
-assert preprocessed_youtube_content_table, "Preprocessed youtube content table is required"
 
 print(f"Bundle root: {bundle_root}")
 print(f"Channel name: {channel_name}")
 print(f"Max videos: {max_videos}")
+print(f"Published after: {published_after if published_after else 'All videos'}")
 print(f"Raw table: {raw_youtube_content_table}")
-print(f"Preprocessed table: {preprocessed_youtube_content_table}")
+
+# Note: Catalog and schema should be created via setup_brickbrain_workspace.py before running this notebook
 
 # COMMAND ----------
 
 import sys
 import os
 import logging
+import warnings
 from typing import List, Dict
 
-sys.path.append(bundle_root)
+# Suppress threadpoolctl noise/warnings
+warnings.filterwarnings('ignore', message='.*threadpoolctl.*')
+warnings.filterwarnings('ignore', category=RuntimeWarning, module='threadpoolctl')
+
+sys.path.append(os.path.join(bundle_root, "agent"))
 
 from retriever_tool.data_ingestion.video_data.utils import YouTubeClient, TranscriptClient, TranscriptCleaner
 
@@ -70,70 +85,133 @@ transcription_service = TranscriptClient(
 channel_id = youtube_client.get_channel_id_from_username(channel_name)
 print(f"Channel ID for '{channel_name}': {channel_id}. ")
 
-videos = youtube_client.get_channel_videos(channel_id, max_results=max_videos)
-print(f"Fetched {len(videos)} videos. ")
-
-# COMMAND ----------
-
-transcribed_videos = transcription_service.get_transcriptions_parallel(
-    all_videos=videos,
-    max_workers=max_workers,
-    delay=0.5
+videos = youtube_client.get_channel_videos(
+    channel_id=channel_id, 
+    max_results=max_videos,
+    published_after=published_after
 )
+print(f"Fetched {len(videos)} videos from YouTube API. ")
 
-successful_transcriptions = sum(1 for video in transcribed_videos if video['transcription_status'] == 'Success')
+# Check for existing videos to implement incremental ingestion
+existing_video_ids = set()
+try:
+    print(f"Checking for existing videos in {raw_youtube_content_table}...")
+    existing_df = spark.table(raw_youtube_content_table)
+    
+    # Spark Connect compatible way to get video IDs
+    video_ids = existing_df.select(col("id.videoId").alias("videoId")).distinct().collect()
+    existing_video_ids = set(row.videoId for row in video_ids if row.videoId)
+    
+    print(f"✅ Found {len(existing_video_ids)} unique videos already in table.")
+except Exception as e:
+    print(f"Table {raw_youtube_content_table} does not exist or is empty. Will create new table.")
+    print(f"Details: {str(e)[:200]}")
 
-print(f"Transcription Results:")
-print(f"- Total videos: {len(transcribed_videos)}")
-print(f"- Successful: {successful_transcriptions}")
-print(f"- Failed: {len(transcribed_videos) - successful_transcriptions}")
+# Filter out already scraped videos and separate them for logging
+new_videos = []
+skipped_videos = []
+
+for video in videos:
+    video_id = video['id']['videoId']
+    if video_id in existing_video_ids:
+        skipped_videos.append(video)
+    else:
+        new_videos.append(video)
+
+print(f"\nVideos from API fetch: {len(videos)} total")
+print(f"  - Already scraped (skipping): {len(skipped_videos)}")
+print(f"  - New videos to fetch: {len(new_videos)}")
+
+# Show skipped videos (only those from current API fetch that already exist)
+if skipped_videos:
+    print(f"\n⏭️  Skipping already scraped videos:")
+    for video in skipped_videos:
+        video_id = video['id']['videoId']
+        title = video['snippet'].get('title', 'Unknown Title')
+        print(f"   - https://youtube.com/watch?v={video_id}")
+        print(f"     Title: {title}")
+
+# Show new videos to fetch
+if new_videos:
+    print(f"\n🆕 New videos to fetch:")
+    for video in new_videos:
+        video_id = video['id']['videoId']
+        title = video['snippet'].get('title', 'Unknown Title')
+        print(f"   - https://youtube.com/watch?v={video_id}")
+        print(f"     Title: {title}")
+
+if len(new_videos) == 0:
+    print("\n✅ No new videos to scrape. All fetched videos are up to date.")
+    # Don't exit - we'll check if existing videos need preprocessing later
+
+videos = new_videos
 
 # COMMAND ----------
 
-df = spark.createDataFrame(transcribed_videos)
-df.write.mode('overwrite').saveAsTable(f"{raw_youtube_content_table}")
-df.display()
+# Only run transcription if we have new videos to fetch
+if len(videos) > 0:
+    transcribed_videos = transcription_service.get_transcriptions_parallel(
+        all_videos=videos,
+        max_workers=max_workers,
+        delay=0.5
+    )
+
+    successful_transcriptions = sum(1 for video in transcribed_videos if video['transcription_status'] == 'Success')
+
+    print(f"Transcription Results:")
+    print(f"- Total videos: {len(transcribed_videos)}")
+    print(f"- Successful: {successful_transcriptions}")
+    print(f"- Failed: {len(transcribed_videos) - successful_transcriptions}")
+else:
+    print("⏭️  Skipping transcription - no new videos to fetch from YouTube")
+    transcribed_videos = []
 
 # COMMAND ----------
 
-transcript_cleaner = TranscriptCleaner(
-    remove_stopwords=False, 
-    fix_spelling=True        
-)
+# If we transcribed new videos, save them to raw table
+if len(transcribed_videos) > 0:
+    # Define explicit schema for YouTube video data to avoid schema inference issues
+    from pyspark.sql.types import StructType, StructField, StringType, MapType
 
-# COMMAND ----------
+    youtube_schema = StructType([
+        StructField("id", MapType(StringType(), StringType()), True),
+        StructField("snippet", MapType(StringType(), StringType()), True),
+        StructField("transcription", StringType(), True),
+        StructField("transcription_status", StringType(), True)
+    ])
 
-prompt = """
-Please analyze the following video transcript and extract the key technical content, insights, and actionable information. Remove all unnecessary filler content and keep all technical information as precise as possible.
+    df = spark.createDataFrame(transcribed_videos, schema=youtube_schema)
 
-Instructions:
-1. Focus on technical concepts, best practices, and specific recommendations
-2. Remove casual conversation, filler content, and repetitive information
-3. Preserve code examples, specific tool names, and technical procedures
-4. Correct terms and acronynms, assuming the downstream users are Databricks Data Engineers (e.g. DBT, ETL)
-5. Keep the most valuable insights that would help data engineers and solutions architects
+    # Always use append mode for raw data ingestion
+    print(f"Writing {len(transcribed_videos)} new videos in append mode")
+    df.write.mode('append').saveAsTable(f"{raw_youtube_content_table}")
 
-Output format in Markdown. 
-1. Key concepts <key concepts> 2. Best practices <best practices> 3. Actionable insights <actionable insights> 4. Technical recommendations <recommendations> 
+    # Display current table stats
+    current_df = spark.table(raw_youtube_content_table)
+    print(f"✅ Total videos in table: {current_df.count()}")
+    df.display()
+else:
+    print("⏭️  No new videos to write to raw table")
 
-Transcript:
-"""
+# Now read ALL videos from raw table for preprocessing
+# This ensures we process videos that may have been scraped but never preprocessed
+print(f"\n📖 Reading all videos from raw table for preprocessing...")
+try:
+    df = spark.table(raw_youtube_content_table)
+    raw_video_count = df.count()
+    print(f"   Found {raw_video_count} total videos in raw table")
+    
+    if raw_video_count == 0:
+        print("   No videos to process")
+        dbutils.notebook.exit("No videos in raw table")
+except Exception as e:
+    print(f"   ❌ Error reading raw table: {str(e)[:200]}")
+    dbutils.notebook.exit("Raw table doesn't exist")
 
-@pandas_udf(returnType=StringType())
-def clean_text_batch(texts: pd.Series) -> pd.Series:
-    """Vectorized cleaning function for pandas UDF."""
-    return texts.apply(transcript_cleaner.clean)
-
-df_cleaned = (
-    df.withColumn("transcription_cleaned", clean_text_batch(col("transcription")))
-      .withColumn("videoId", col("id")['videoId'])
-      .withColumn("url", concat(lit("https://youtube.com/watch?v="), col("videoId")))
-      .withColumn("domain", lit("youtube.com"))
-      .withColumn("transcription_ai_cleaned", 
-                  expr(f"ai_query('databricks-meta-llama-3-3-70b-instruct', concat('{prompt}', transcription_cleaned))"))
-      .withColumn("content_type", lit("video"))
-      .select("url", "domain", "transcription_ai_cleaned")
-) 
-
-df_cleaned.write.mode('overwrite').saveAsTable(f"{preprocessed_youtube_content_table}")
-df_cleaned.display()
+print(f"\n{'='*80}")
+print(f"✅ Video Ingestion Complete")
+print(f"{'='*80}")
+print(f"Videos stored in: {raw_youtube_content_table}")
+print(f"Total videos in raw table: {spark.table(raw_youtube_content_table).count()}")
+print(f"\nℹ️  Note: AI extraction and chunking will be performed by ChunkingTask")
+print(f"{'='*80}\n")
