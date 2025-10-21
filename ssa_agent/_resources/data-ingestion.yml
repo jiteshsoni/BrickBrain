@@ -72,7 +72,6 @@ resources:
               vector_search_index: ${var.uc_catalog}.${var.schema}.brickbrain_index
               preprocessed_data_table: ${var.uc_catalog}.${var.schema}.brickbrain_delta_table
               preprocessed_chunked_table: ${var.uc_catalog}.${var.schema}.preprocessed_content_chunked
-              force_rebuild: "false"
               git_source_info: "url:${bundle.git.origin_url}; branch:${bundle.git.branch}; commit:${bundle.git.commit}"
 
         - task_key: KnowledgeAssistantSync
@@ -82,4 +81,20 @@ resources:
             notebook_path: ../agent/retriever_tool/vector_search/notebooks/KnowledgeAssistantSync.py
             base_parameters:
               knowledge_assistant_id: ${var.knowledge_assistant_id}
+              git_source_info: "url:${bundle.git.origin_url}; branch:${bundle.git.branch}; commit:${bundle.git.commit}"
+
+    # Standalone VectorSearchIngestion job for independent testing/updates
+    vector_search_ingestion_job:
+      name: ${bundle.target}-BrickBrain-vector-search-ingestion
+      <<: *permissions
+      
+      tasks:
+        - task_key: VectorSearchIngestion
+          notebook_task:
+            notebook_path: ../agent/retriever_tool/vector_search/notebooks/VectorSearchIngestion.py
+            base_parameters:
+              vector_search_endpoint: ${var.vector_search_endpoint}
+              vector_search_index: ${var.uc_catalog}.${var.schema}.brickbrain_index
+              preprocessed_data_table: ${var.uc_catalog}.${var.schema}.brickbrain_delta_table
+              preprocessed_chunked_table: ${var.uc_catalog}.${var.schema}.preprocessed_content_chunked
               git_source_info: "url:${bundle.git.origin_url}; branch:${bundle.git.branch}; commit:${bundle.git.commit}"

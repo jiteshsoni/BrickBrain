@@ -37,6 +37,16 @@ print(f"Raw table: {raw_blog_content_table}")
 
 # COMMAND ----------
 
+# Set default catalog to avoid Hive Metastore errors
+catalog_name = raw_blog_content_table.split('.')[0]
+schema_name = raw_blog_content_table.split('.')[1]
+print(f"\n🔧 Setting default catalog: {catalog_name}")
+print(f"🔧 Setting default schema: {schema_name}")
+spark.sql(f"USE CATALOG {catalog_name}")
+spark.sql(f"USE SCHEMA {schema_name}")
+
+# COMMAND ----------
+
 import sys
 import os
 import logging

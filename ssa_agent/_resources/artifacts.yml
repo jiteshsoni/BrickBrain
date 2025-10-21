@@ -7,26 +7,27 @@ resources:
   # experiment: 
 
 
-  apps:
-    # Slackbot application
-    brickbrain_slackbot:
-      name: ${bundle.target}-brickbrain-slackbot
-      description: "BrickBrain Slackbot"
-      source_code_path: ${workspace.file_path}/slackbot/app
-      resources:
-        # TODO: update this with the correct configuration.
-        # - name: serving-endpoint
-        #   serving_endpoint:
-        #     name: ${ka_endpoint_name}
-        #     permission: CAN_QUERY
-        #   database: 
-        #     name: ${lakebase_instance}
-        #   secret: 
-        #     name: ${databricks_secret_scope}
+  # TODO: Temporarily disabled - apps resource type not yet supported in this Databricks CLI version
+  # apps:
+  #   # Slackbot application
+  #   brickbrain_slackbot:
+  #     name: ${bundle.target}-brickbrain-slackbot
+  #     description: "BrickBrain Slackbot"
+  #     source_code_path: ${workspace.file_path}/slackbot/app
+  #     resources:
+  #       # TODO: update this with the correct configuration.
+  #       # - name: serving-endpoint
+  #       #   serving_endpoint:
+  #       #     name: ${ka_endpoint_name}
+  #       #     permission: CAN_QUERY
+  #       #   database: 
+  #       #     name: ${lakebase_instance}
+  #       #   secret: 
+  #       #     name: ${databricks_secret_scope}
           
 
-    # Chat UI application  
-    brickbrain_chatapp:
-      name: ${bundle.target}-brickbrain-chatapp
-      description: "BrickBrain Streamlit chat interface"
-      source_code_path: ${workspace.file_path}/chatapp/app
+  #   # Chat UI application  
+  #   brickbrain_chatapp:
+  #     name: ${bundle.target}-brickbrain-chatapp
+  #     description: "BrickBrain Streamlit chat interface"
+  #     source_code_path: ${workspace.file_path}/chatapp/app

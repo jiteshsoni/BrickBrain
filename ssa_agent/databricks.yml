@@ -6,7 +6,7 @@ bundle:
 variables:
   uc_catalog:
     description: "Unity Catalog name"
-    default: "main"
+    default: "brickbrain"
   schema:
     description: "Schema name for data storage"
     default: "default"
@@ -72,7 +72,7 @@ targets:
       host: ""
     variables:
       uc_catalog: "brickbrain"
-      schema: "brickbrain_dev"
+      schema: "default"
       experiment_name: "brickbrain_dev_experiment"
       registered_model: "brickbrain_dev_agent"
 
@@ -82,7 +82,7 @@ targets:
       host: "" 
     variables:
       uc_catalog: "brickbrain"
-      schema: "brickbrain_stg"
+      schema: "default"
       experiment_name: "brickbrain_experiment"
       registered_model: "brickbrain_agent"
 
@@ -92,6 +92,6 @@ targets:
       host: "" 
     variables:
       uc_catalog: "brickbrain"
-      schema: "brickbrain_prod"
+      schema: "default"
       experiment_name: "brickbrain_prod_experiment"
       registered_model: "brickbrain_prod_agent"

@@ -19,7 +19,7 @@ prompt: |
 
 source:
   - type: vector_search_index
-    index_name: veena_ramesh_test.data.brickbrain_index
+    index_name: brickbrain.default.brickbrain_index
 
 instructions: | 
   You are not a creative writer. You are a subject matter expert.
