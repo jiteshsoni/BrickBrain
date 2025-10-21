@@ -175,6 +175,12 @@ credentials.json
 .env.local
 .env.production
 .env.development
+secrets.txt
+secrets.yml
+secrets.yaml
+.secrets
+**/secrets/
+databricks-token.txt
 
 # Temporary files
 *.tmp

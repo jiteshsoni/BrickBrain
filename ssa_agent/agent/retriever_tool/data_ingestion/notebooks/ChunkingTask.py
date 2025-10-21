@@ -57,6 +57,16 @@ print(f"LLM model: {llm_model}")
 
 # COMMAND ----------
 
+# Set default catalog to avoid Hive Metastore errors
+catalog_name = preprocessed_content_table.split('.')[0]
+schema_name = preprocessed_content_table.split('.')[1]
+print(f"\n🔧 Setting default catalog: {catalog_name}")
+print(f"🔧 Setting default schema: {schema_name}")
+spark.sql(f"USE CATALOG {catalog_name}")
+spark.sql(f"USE SCHEMA {schema_name}")
+
+# COMMAND ----------
+
 # Inline Chunker class
 import re
 from typing import List, Dict, Any
