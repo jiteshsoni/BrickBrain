@@ -1,6 +1,6 @@
 # Local development environment variables
 # Copy to .dev.vars and fill in actual values
 
-DATABRICKS_SERVING_URL=https://dbc-a657af2e-14d9.cloud.databricks.com/serving-endpoints/ka-1ff550b7-endpoint/invocations
+DATABRICKS_SERVING_URL=https://dbc-61d167ee-4668.cloud.databricks.com/serving-endpoints/ka-857f2e9d-endpoint/invocations
 DATABRICKS_TOKEN=dapi_YOUR_TOKEN_HERE
 MCP_SHARED_KEY=your-shared-key-here

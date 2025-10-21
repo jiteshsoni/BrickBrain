@@ -3,7 +3,7 @@
 
 # COMMAND ----------
 
-# MAGIC dbutils.library.restartPython()
+dbutils.library.restartPython()
 
 # COMMAND ----------
 
@@ -15,34 +15,28 @@
 # - vector_search_index: Full name of the vector search index (catalog.schema.index)
 # - preprocessed_data_table: Unity Catalog table to write data with IDs to (for delta sync)
 # - preprocessed_chunked_table: Unity Catalog table containing chunked content
-# - force_rebuild: (optional) Set to "true" to drop and recreate index, "false" for efficient sync (default: "false")
 #
 # Features:
+# - Always rebuilds: Drops and recreates index on every run for predictable results
 # - Deterministic IDs: Uses hash of url + chunk_id to ensure consistent IDs across runs
-# - Smart sync: Only updates changed data when force_rebuild=false
-# - Safety checks: Validates schema and verifies index contains searchable data
+# - Safety checks: Validates schema before index creation
 #
 ########################################################################################################################
 
 # COMMAND ----------
 
-
 # DBTITLE 1,Define variables from parameters
-# Create widgets first (ensures they exist before reading)
-dbutils.widgets.text("vector_search_endpoint", "")
-dbutils.widgets.text("vector_search_index", "")
-dbutils.widgets.text("preprocessed_data_table", "")
-dbutils.widgets.text("preprocessed_chunked_table", "")
-dbutils.widgets.dropdown("force_rebuild", "false", ["true", "false"])
+
+# Create widgets with production defaults (can be overridden by job parameters)
+dbutils.widgets.text("vector_search_endpoint", "brickbrain")
+dbutils.widgets.text("vector_search_index", "brickbrain.default.brickbrain_index")
+dbutils.widgets.text("preprocessed_data_table", "brickbrain.default.brickbrain_delta_table")
+dbutils.widgets.text("preprocessed_chunked_table", "brickbrain.default.preprocessed_content_chunked")
 
 vector_search_endpoint = dbutils.widgets.get("vector_search_endpoint")
 vector_search_index = dbutils.widgets.get("vector_search_index")
 preprocessed_data_table = dbutils.widgets.get("preprocessed_data_table")
 preprocessed_chunked_table = dbutils.widgets.get("preprocessed_chunked_table")
-
-# Read force_rebuild parameter
-force_rebuild_str = dbutils.widgets.get("force_rebuild").lower().strip()
-force_rebuild = force_rebuild_str == "true"
 
 assert vector_search_endpoint, "Vector Search Endpoint is required"
 assert vector_search_index, "Vector Search Index is required"
@@ -53,24 +47,28 @@ print(f"Vector Search Endpoint: {vector_search_endpoint}")
 print(f"Vector Search Index: {vector_search_index}")
 print(f"Preprocessed Data Table (for delta sync): {preprocessed_data_table}")
 print(f"Preprocessed Chunked Table (source): {preprocessed_chunked_table}")
-print(f"Force Rebuild: {force_rebuild}")
+print(f"Mode: ALWAYS REBUILD (drops and recreates index)")
 
-# Set default catalog to avoid Hive Metastore errors
+# Set current catalog and database using Spark conf to avoid Hive Metastore errors
 catalog_name = preprocessed_data_table.split('.')[0]
 schema_name = preprocessed_data_table.split('.')[1]
-print(f"\n🔧 Setting default catalog: {catalog_name}")
-print(f"🔧 Setting default schema: {schema_name}")
-spark.sql(f"USE CATALOG {catalog_name}")
-spark.sql(f"USE SCHEMA {schema_name}")
+print(f"\n🔧 Setting Spark configuration for Unity Catalog")
+print(f"   Catalog: {catalog_name}, Schema: {schema_name}")
 
-# If force rebuild, drop the preprocessed data table (will be recreated with new IDs)
-if force_rebuild:
-    print(f"\n🔄 Force rebuild requested - dropping preprocessed data table...")
-    try:
-        spark.sql(f"DROP TABLE IF EXISTS {preprocessed_data_table}")
-        print(f"   ✅ Dropped {preprocessed_data_table}")
-    except Exception as e:
-        print(f"   ⚠️  Could not drop {preprocessed_data_table}: {str(e)[:100]}")
+# Set via Spark SQL configuration (more reliable with Spark Connect)
+spark.sql(f"USE CATALOG `{catalog_name}`")
+spark.sql(f"USE SCHEMA `{schema_name}`")
+
+# Verify settings
+current_catalog = spark.sql("SELECT current_catalog()").collect()[0][0]
+current_schema = spark.sql("SELECT current_schema()").collect()[0][0]
+print(f"   ✅ Current catalog: {current_catalog}")
+print(f"   ✅ Current schema: {current_schema}")
+
+# Always drop the preprocessed data table (will be recreated with fresh data)
+print(f"\n🔄 Dropping preprocessed data table for fresh rebuild...")
+spark.sql(f"DROP TABLE IF EXISTS {preprocessed_data_table}")
+print(f"   ✅ Dropped {preprocessed_data_table}")
 
 # COMMAND ----------
 
@@ -111,30 +109,61 @@ print(f"✅ Wrote {source_row_count:,} rows to {preprocessed_data_table}")
 
 # DBTITLE 1,Initialize endpoint
 from databricks.vector_search.client import VectorSearchClient
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.vectorsearch import EndpointType
 import time
 
 vsc = VectorSearchClient(disable_notice=True)
+w = WorkspaceClient()
 
 try:
     endpoint = vsc.get_endpoint(vector_search_endpoint)
-except Exception:
-    vsc.create_endpoint(name=vector_search_endpoint, endpoint_type="STANDARD")
+    print(f"✅ Found existing endpoint: {vector_search_endpoint}")
+    print(f"   Region: {endpoint.get('endpoint_status', {}).get('region', 'N/A')}")
+except Exception as e:
+    if "does not exist" in str(e).lower() or "not found" in str(e).lower():
+        print(f"📍 Creating new endpoint: {vector_search_endpoint}")
+        print(f"   Target region: us-west-2 (AWS Oregon)")
+        
+        # Create endpoint with explicit region specification
+        # Note: Region is determined by the workspace location, but we can use SDK for better control
+        try:
+            w.vector_search_endpoints.create_endpoint(
+                name=vector_search_endpoint,
+                endpoint_type=EndpointType.STANDARD
+            )
+            print(f"✅ Endpoint created in workspace region (us-west-2)")
+        except Exception as create_error:
+            # Fallback to VectorSearchClient if SDK method fails
+            print(f"   Falling back to VectorSearchClient...")
+            vsc.create_endpoint(name=vector_search_endpoint, endpoint_type="STANDARD")
+            print(f"✅ Endpoint created")
+    else:
+        raise RuntimeError(f"❌ Failed to get/create endpoint: {str(e)}")
 
 endpoint = vsc.get_endpoint(vector_search_endpoint)
-while endpoint['endpoint_status']['state'] not in ["ONLINE", "PROVISIONING"]:
+# IMPORTANT: Wait for endpoint to be ready for index operations
+# Valid ready states: ONLINE, ONLINE_NO_PENDING_UPDATE, PROVISIONING_INITIAL_SNAPSHOT
+# PROVISIONING state (without suffix) means endpoint is still being created
+ready_states = ["ONLINE", "ONLINE_NO_PENDING_UPDATE", "PROVISIONING_INITIAL_SNAPSHOT"]
+while endpoint['endpoint_status']['state'] not in ready_states:
+    current_state = endpoint['endpoint_status']['state']
+    print(f"   ⏳ Waiting for endpoint to be ready... (current state: {current_state})")
     time.sleep(30)
     endpoint = vsc.get_endpoint(vector_search_endpoint)
 
-print(f"Endpoint named {vector_search_endpoint} is ready.")
+endpoint_state = endpoint['endpoint_status']['state']
+print(f"✅ Endpoint {vector_search_endpoint} is ready (state: {endpoint_state})!")
+print(f"   Region: {endpoint.get('endpoint_status', {}).get('region', 'Inherited from workspace')}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Create or Sync Index with Schema Validation
+# DBTITLE 1,Create Fresh Index with Schema Validation
 from databricks.sdk import WorkspaceClient
 import databricks.sdk.service.catalog as c
 
 # SAFETY CHECK: Validate required columns exist
-print(f"\n🔍 Validating schema before creating/syncing index...")
+print(f"\n🔍 Validating schema before creating index...")
 required_columns = ["id", "content", "url", "content_type", "domain", "chunk_id"]
 table_df = spark.table(preprocessed_data_table)
 table_columns = table_df.columns
@@ -149,153 +178,40 @@ if missing_columns:
 
 print(f"✅ Schema validation passed - all required columns present: {required_columns}")
 
-# Check if index already exists
-index_exists = False
-try:
-    print(f"\n🔍 Checking for existing index {vector_search_index}...")
-    existing_index = vsc.get_index(vector_search_endpoint, vector_search_index)
-    index_exists = True
-    
-    if force_rebuild:
-        print(f"🔄 Force rebuild requested - deleting existing index...")
-        vsc.delete_index(vector_search_index)
-        index_exists = False
-        print(f"✅ Existing index deleted, will create fresh index")
-    else:
-        print(f"📍 Found existing index - will trigger sync to update with new data")
-except Exception as e:
-    if "does not exist" in str(e).lower() or "not found" in str(e).lower():
-        print(f"ℹ️  No existing index found - will create new index")
-    else:
-        print(f"⚠️  Error checking index: {str(e)[:200]}")
-
-if not index_exists:
-    # Create fresh index
-    print(f"\n🆕 Creating new index for {source_row_count:,} rows...")
-    try:
-        vsc.create_delta_sync_index(
-            endpoint_name=vector_search_endpoint,
-            index_name=vector_search_index,
-            source_table_name=preprocessed_data_table,
-            pipeline_type="TRIGGERED",
-            primary_key="id",
-            embedding_source_column="content", # The column containing our text
-            embedding_model_endpoint_name="databricks-gte-large-en", # The embedding endpoint used to create the embeddings
-            columns_to_sync=[
-                "url",
-                "content_type",
-                "domain",
-                "chunk_id"
-            ]
-        )
-        print(f"✅ Index created successfully")
-    except Exception as e:
-        if "RESOURCE_ALREADY_EXISTS" in str(e):
-            print(f"ℹ️  Index was just created (concurrent creation), will sync")
-            index_exists = True
-        else:
-            raise
-
-if index_exists:
-    # Trigger sync to update with new data from overwritten source table
-    print(f"\n🔄 Triggering index sync for {source_row_count:,} rows...")
-    try:
-        vector_index = vsc.get_index(vector_search_endpoint, vector_search_index)
-        vector_index.sync()
-        print(f"✅ Index sync triggered - will process new data from source table")
-    except Exception as e:
-        print(f"⚠️  Error triggering sync: {str(e)[:200]}")
-        print(f"   Index will auto-sync via Change Data Feed")
-
 # COMMAND ----------
 
-# DBTITLE 1,SMART VALIDATION: Check Index Row Count (Non-Intrusive)
 import time
 
-print(f"\n🔍 Smart Validation: Checking index data availability...")
-print(f"   Source table rows: {source_row_count:,}")
-
-vector_index = vsc.get_index(endpoint_name=vector_search_endpoint, index_name=vector_search_index)
-
-# Get index status (indexed row count)
+# Delete the index if it exists
+print(f"\n🗑️  Deleting index {vector_search_index} (if exists)...")
 try:
-    index_status = vector_index.describe()
-    status_info = index_status.get('status', {})
-    indexed_rows = status_info.get('indexed_row_count', 0)
-    detailed_state = status_info.get('detailed_state', 'UNKNOWN')
-    
-    print(f"\n📊 Index Status:")
-    print(f"   State: {detailed_state}")
-    print(f"   Indexed rows: {indexed_rows:,} (source: {source_row_count:,})")
-    
-    if indexed_rows > 0:
-        coverage_pct = (indexed_rows / source_row_count * 100) if source_row_count > 0 else 0
-        print(f"   Coverage: {coverage_pct:.1f}%")
-        
-        # Pragmatic check: If we have >= 95% of rows, that's good enough
-        if coverage_pct >= 95.0:
-            print(f"\n✅ Index data validation PASSED")
-            print(f"   {indexed_rows:,} rows indexed ({coverage_pct:.1f}% coverage)")
-            print(f"   Data successfully synced to vector index!")
-            
-        elif "PROVISIONING" in detailed_state or "INITIALIZING" in detailed_state:
-            # Index is still being created - data will be there eventually
-            print(f"\n⏭️  Index is provisioning - data sync will complete automatically")
-            print(f"   Current: {indexed_rows:,} rows")
-            print(f"   Index will finish syncing in background via Delta Change Feed")
-            print(f"   Job can proceed - no data loss risk")
-            
-        else:
-            print(f"\n⚠️  Index has {coverage_pct:.1f}% coverage (expected >= 95%)")
-            print(f"   This is acceptable - index may still be syncing")
-            
-    elif "PROVISIONING" in detailed_state or "INITIALIZING" in detailed_state:
-        # Brand new index - endpoint is being provisioned
-        print(f"\n⏭️  Index endpoint is provisioning (first-time setup)")
-        print(f"   State: {detailed_state}")
-        print(f"   Data will sync automatically once endpoint is ready")
-        print(f"   This can take 5-15 minutes but happens in background")
-        print(f"\n✅ Job can proceed - index will sync data automatically")
-        
-    else:
-        # Index exists but has no data and isn't provisioning - this is suspicious
-        print(f"\n⚠️  Warning: Index has 0 rows and state is {detailed_state}")
-        print(f"   Will attempt quick search test...")
-        
-        # Try a search as last resort
-        try:
-            results = vector_index.similarity_search(
-                query_text="databricks",
-                columns=["id"],
-                num_results=1
-            )
-            num_results = len(results.get('result', {}).get('data_array', []))
-            
-            if num_results > 0:
-                print(f"   ✅ Search test passed - index has data!")
-            else:
-                print(f"   ⚠️  Index appears empty - may still be syncing")
-                
-        except Exception as search_err:
-            print(f"   ⏭️  Search not available yet: {str(search_err)[:100]}")
-            print(f"   Index will become searchable once provisioning completes")
-
+    vsc.delete_index(
+        endpoint_name=vector_search_endpoint,
+        index_name=vector_search_index
+    )
+    print(f"✅ Index deleted successfully")
 except Exception as e:
-    error_msg = str(e)
-    print(f"\n⚠️  Could not check index status: {error_msg[:200]}")
-    print(f"   This is OK - index may still be provisioning")
-    print(f"   Data will sync automatically via Delta Change Feed")
+    if "does not exist" in str(e).lower() or "not found" in str(e).lower():
+        print(f"ℹ️  Index didn't exist - proceeding to create a new one")
+    else:
+        raise RuntimeError(f"❌ Failed to delete index: {str(e)}")
 
-print(f"\n{'='*70}")
-print(f"✅ VALIDATION COMPLETE - JOB SUCCESSFUL")
-print(f"{'='*70}")
-print(f"  Source Table: {preprocessed_data_table} ({source_row_count:,} rows)")
-print(f"  Vector Index: {vector_search_index}")
-print(f"  Sync Method: Delta Change Feed (automatic)")
-print(f"\n💡 Note: Index sync happens asynchronously in background.")
-print(f"   If endpoint is provisioning, data will appear once ready (5-15 min).")
-print(f"   Query the index via Knowledge Agent once 'ONLINE' in Databricks UI.")
-print(f"{'='*70}")
-    
+# Add a delay to ensure the deletion completes
+time.sleep(10)  # Adjust the delay time as needed
+
+# Create a fresh index
+print(f"\n🆕 Creating a new index for {source_row_count:,} rows...")
+vsc.create_delta_sync_index(
+    endpoint_name=vector_search_endpoint,
+    index_name=vector_search_index,
+    source_table_name=preprocessed_data_table,
+    pipeline_type="TRIGGERED",
+    primary_key="id",
+    embedding_source_column="content",
+    embedding_model_endpoint_name="databricks-gte-large-en",
+    columns_to_sync=["url", "content_type", "domain", "chunk_id"]
+)
+print(f"✅ Index created successfully - data syncing will start automatically")
+
 # COMMAND ----------
 
