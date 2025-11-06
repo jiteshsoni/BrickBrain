@@ -66,9 +66,14 @@ def print_info(text: str):
     """Print info message."""
     print(f"{Colors.CYAN}ℹ️  {text}{Colors.ENDC}")
 
-def run_command(cmd: str, input_text: str = None, check: bool = True) -> Tuple[bool, str, str]:
+def run_command(cmd: str, input_text: str = None, check: bool = True, profile: str = None) -> Tuple[bool, str, str]:
     """Execute shell command and return success status and output."""
     try:
+        # Add profile flag if specified
+        if profile and 'databricks' in cmd:
+            # Insert --profile flag after 'databricks' command
+            cmd = cmd.replace('databricks ', f'databricks --profile {profile} ')
+        
         result = subprocess.run(
             cmd,
             shell=True,
@@ -114,13 +119,16 @@ def load_env_file(env_path: str = None) -> Dict[str, str]:
         print_warning(f"Error reading .env file: {e}")
         return env_vars
 
-def verify_databricks_cli() -> Tuple[bool, str]:
+def verify_databricks_cli(profile: str = None) -> Tuple[bool, str]:
     """Verify Databricks CLI is installed and configured."""
     print_header("Step 1: Verifying Databricks CLI")
     
+    if profile:
+        print_info(f"Using profile: {profile}")
+    
     # Check if CLI is installed
     print("🔍 Checking Databricks CLI installation...")
-    success, stdout, stderr = run_command('databricks --version', check=False)
+    success, stdout, stderr = run_command('databricks --version', check=False, profile=profile)
     
     if not success:
         print_error("Databricks CLI not installed")
@@ -131,28 +139,29 @@ def verify_databricks_cli() -> Tuple[bool, str]:
     
     # Check if configured
     print("\n🔍 Checking Databricks CLI configuration...")
-    success, stdout, stderr = run_command('databricks workspace list / --output json', check=False)
+    success, stdout, stderr = run_command('databricks workspace list / --output json', check=False, profile=profile)
     
     if not success:
         print_error("Databricks CLI not configured")
-        print_info("Run: databricks configure --token")
+        print_info(f"Run: databricks configure --token{' --profile ' + profile if profile else ''}")
         return False, None
     
     # Get workspace host
-    success, host, _ = run_command('databricks config get host', check=False)
+    success, host, _ = run_command('databricks config get host', check=False, profile=profile)
     host = host.strip() if success else "Unknown"
     
     print_success(f"Connected to workspace: {host}")
     
     return True, host
 
-def get_or_create_sql_warehouse(auto_select: bool = True) -> Optional[str]:
+def get_or_create_sql_warehouse(auto_select: bool = True, profile: str = None) -> Optional[str]:
     """Get existing SQL warehouse ID or guide user to create one."""
     print("\n🏭 Checking SQL warehouses...")
     
     success, stdout, stderr = run_command(
         'databricks warehouses list --output json',
-        check=False
+        check=False,
+        profile=profile
     )
     
     if success and stdout:
@@ -178,7 +187,7 @@ def get_or_create_sql_warehouse(auto_select: bool = True) -> Optional[str]:
     
     return None
 
-def create_catalogs_and_schemas(warehouse_id: str, environment: str) -> bool:
+def create_catalogs_and_schemas(warehouse_id: str, environment: str, profile: str = None) -> bool:
     """Create Unity Catalog and schemas."""
     print_header("Step 2: Creating Unity Catalog & Schemas")
     
@@ -206,7 +215,7 @@ def create_catalogs_and_schemas(warehouse_id: str, environment: str) -> bool:
     total_count = 0
     
     # Get current user email for permissions
-    success, user_email, _ = run_command('databricks current-user me --output json', check=False)
+    success, user_email, _ = run_command('databricks current-user me --output json', check=False, profile=profile)
     if success:
         try:
             import json
@@ -224,7 +233,8 @@ def create_catalogs_and_schemas(warehouse_id: str, environment: str) -> bool:
         print(f"  📦 Creating catalog: {catalog}")
         success, _, stderr = run_command(
             f'databricks catalogs create {catalog}',
-            check=False
+            check=False,
+            profile=profile
         )
         
         total_count += 1
@@ -242,7 +252,8 @@ def create_catalogs_and_schemas(warehouse_id: str, environment: str) -> bool:
         print(f"  📁 Creating schema: {catalog}.{schema}")
         success, _, stderr = run_command(
             f'databricks schemas create {schema} {catalog}',
-            check=False
+            check=False,
+            profile=profile
         )
         
         total_count += 1
@@ -258,7 +269,7 @@ def create_catalogs_and_schemas(warehouse_id: str, environment: str) -> bool:
     print(f"\n📊 Result: {success_count}/{total_count} operations succeeded")
     return success_count == total_count
 
-def setup_secrets(scope_name: str, env_vars: Dict[str, str] = None, skip_secrets: bool = False) -> bool:
+def setup_secrets(scope_name: str, env_vars: Dict[str, str] = None, skip_secrets: bool = False, profile: str = None) -> bool:
     """Create secret scope and store secrets from .env file or interactive input."""
     print_header("Step 3: Setting up Databricks Secrets")
     
@@ -270,7 +281,8 @@ def setup_secrets(scope_name: str, env_vars: Dict[str, str] = None, skip_secrets
     print(f"🔍 Checking secret scope: {scope_name}")
     success, stdout, _ = run_command(
         'databricks secrets list-scopes --output json',
-        check=False
+        check=False,
+        profile=profile
     )
     
     scope_exists = scope_name in stdout if success else False
@@ -279,7 +291,8 @@ def setup_secrets(scope_name: str, env_vars: Dict[str, str] = None, skip_secrets
         print(f"📦 Creating secret scope: {scope_name}")
         success, _, stderr = run_command(
             f'databricks secrets create-scope {scope_name}',
-            check=False
+            check=False,
+            profile=profile
         )
         if success:
             print_success(f"Secret scope created: {scope_name}")
@@ -318,7 +331,7 @@ def setup_secrets(scope_name: str, env_vars: Dict[str, str] = None, skip_secrets
             if value:
                 print(f"  📌 {key}")
                 cmd = f'databricks secrets put-secret {scope_name} {key}'
-                success, _, stderr = run_command(cmd, input_text=value, check=False)
+                success, _, stderr = run_command(cmd, input_text=value, check=False, profile=profile)
                 
                 if success:
                     print_success(f"Stored: {key}")
@@ -335,14 +348,15 @@ def setup_secrets(scope_name: str, env_vars: Dict[str, str] = None, skip_secrets
     print("\n📋 Verifying secrets...")
     success, stdout, _ = run_command(
         f'databricks secrets list-secrets {scope_name}',
-        check=False
+        check=False,
+        profile=profile
     )
     if success:
         print(stdout)
     
     return True
 
-def deploy_bundle(environment: str, skip_deploy: bool) -> bool:
+def deploy_bundle(environment: str, skip_deploy: bool, profile: str = None) -> bool:
     """Validate and deploy Databricks bundle."""
     print_header("Step 4: Deploying Databricks Bundle")
     
@@ -354,7 +368,8 @@ def deploy_bundle(environment: str, skip_deploy: bool) -> bool:
     print(f"🔍 Validating bundle for environment: {environment}")
     success, stdout, stderr = run_command(
         f'databricks bundle validate -t {environment}',
-        check=False
+        check=False,
+        profile=profile
     )
     
     if not success:
@@ -369,7 +384,8 @@ def deploy_bundle(environment: str, skip_deploy: bool) -> bool:
     print(f"\n🚀 Deploying bundle to {environment}...")
     success, stdout, stderr = run_command(
         f'databricks bundle deploy -t {environment}',
-        check=False
+        check=False,
+        profile=profile
     )
     
     if not success:
@@ -384,14 +400,15 @@ def deploy_bundle(environment: str, skip_deploy: bool) -> bool:
     print("\n📊 Bundle summary:")
     success, stdout, _ = run_command(
         f'databricks bundle summary -t {environment}',
-        check=False
+        check=False,
+        profile=profile
     )
     if success:
         print(stdout)
     
     return True
 
-def run_data_ingestion_job(environment: str) -> bool:
+def run_data_ingestion_job(environment: str, profile: str = None) -> bool:
     """Run the data ingestion job."""
     print_header("Step 5: Running Data Ingestion Job")
     
@@ -400,7 +417,8 @@ def run_data_ingestion_job(environment: str) -> bool:
     
     success, stdout, stderr = run_command(
         f'databricks bundle run data_ingestion_job -t {environment}',
-        check=False
+        check=False,
+        profile=profile
     )
     
     if success:
@@ -422,6 +440,12 @@ Examples:
   # Full setup for dev environment (catalogs + secrets + deploy)
   python setup_brickbrain_workspace.py --environment dev
   
+  # Use a specific profile from .databrickscfg
+  python setup_brickbrain_workspace.py --profile brickbrain
+  
+  # Setup with custom profile and environment
+  python setup_brickbrain_workspace.py --profile brickbrain --environment dev
+  
   # Setup and run data ingestion job
   python setup_brickbrain_workspace.py --run-job
   
@@ -433,7 +457,7 @@ Examples:
 
 Prerequisites:
   - .env file in project root with YOUTUBE_API_KEY, WEBSHARE_PROXY_USERNAME, WEBSHARE_PROXY_PASSWORD
-  - Databricks CLI configured with host and token
+  - Databricks CLI configured with host and token (or specific profile in .databrickscfg)
   - SQL warehouse available in workspace
         """
     )
@@ -443,6 +467,12 @@ Prerequisites:
         choices=['dev', 'stage', 'prod', 'all'],
         default='dev',
         help='Target environment (default: dev)'
+    )
+    
+    parser.add_argument(
+        '--profile', '-p',
+        default=None,
+        help='Databricks CLI profile to use from .databrickscfg (default: DEFAULT profile)'
     )
     
     parser.add_argument(
@@ -484,6 +514,7 @@ Prerequisites:
     
     print(f"📋 Configuration:")
     print(f"   Environment: {args.environment}")
+    print(f"   Profile: {args.profile if args.profile else 'DEFAULT'}")
     print(f"   Secret Scope: {args.secret_scope}")
     print(f"   Skip Secrets: {args.skip_secrets}")
     print(f"   Skip Deploy: {args.skip_deploy}")
@@ -494,28 +525,28 @@ Prerequisites:
     env_vars = load_env_file()
     
     # Step 1: Verify Databricks CLI
-    success, workspace_host = verify_databricks_cli()
+    success, workspace_host = verify_databricks_cli(profile=args.profile)
     if not success:
         sys.exit(1)
     
     # Step 2: Create catalogs and schemas
-    warehouse_id = get_or_create_sql_warehouse(auto_select=True)
-    catalog_success = create_catalogs_and_schemas(warehouse_id, args.environment)
+    warehouse_id = get_or_create_sql_warehouse(auto_select=True, profile=args.profile)
+    catalog_success = create_catalogs_and_schemas(warehouse_id, args.environment, profile=args.profile)
     
     # Step 3: Setup secrets (always run unless explicitly skipped)
-    secrets_success = setup_secrets(args.secret_scope, env_vars, args.skip_secrets)
+    secrets_success = setup_secrets(args.secret_scope, env_vars, args.skip_secrets, profile=args.profile)
     if not secrets_success:
         print_warning("Secrets setup had issues, but continuing...")
     
     # Step 4: Deploy bundle
-    deploy_success = deploy_bundle(args.environment, args.skip_deploy)
+    deploy_success = deploy_bundle(args.environment, args.skip_deploy, profile=args.profile)
     if not deploy_success:
         print_error("Bundle deployment failed")
         sys.exit(1)
     
     # Step 5: Run job (optional)
     if args.run_job and not args.skip_deploy:
-        job_success = run_data_ingestion_job(args.environment)
+        job_success = run_data_ingestion_job(args.environment, profile=args.profile)
         if not job_success:
             print_warning("Job execution failed, but deployment is complete")
     

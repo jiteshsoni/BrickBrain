@@ -413,7 +413,7 @@ print(f"   Expansion ratio: {expansion_ratio:.2f}x")
 
 # Breakdown by content type
 print(f"\n   Chunks by content type:")
-chunked_df.groupBy("content_type").count().show()
+# chunked_df.groupBy("content_type").count().show()
 
 # COMMAND ----------
 

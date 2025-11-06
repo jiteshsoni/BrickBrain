@@ -5,6 +5,8 @@ common_permissions: &permissions
   permissions:
     - level: CAN_VIEW
       group_name: users
+    - level: CAN_MANAGE
+      user_name: jitesh.soni@databricks.com
 
 resources:
   jobs:

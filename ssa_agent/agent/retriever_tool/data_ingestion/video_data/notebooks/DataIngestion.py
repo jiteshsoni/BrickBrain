@@ -31,7 +31,7 @@
 bundle_root = dbutils.widgets.get("bundle_root")
 channel_name = dbutils.widgets.get("channel_name")
 max_videos = int(dbutils.widgets.get("max_videos")) 
-max_workers = 5  # Number of parallel workers for transcription
+max_workers = 2  # Number of parallel workers for transcription (reduced to avoid 429 errors)
 published_after = dbutils.widgets.get("published_after") or None  # Optional date filter
 webshare_proxy_username = dbutils.secrets.get(scope="brickbrain_ssa_agent_scope", key="webshare_proxy_username")
 webshare_proxy_password = dbutils.secrets.get(scope="brickbrain_ssa_agent_scope", key="webshare_proxy_password") 
@@ -163,7 +163,7 @@ if len(videos) > 0:
     transcribed_videos = transcription_service.get_transcriptions_parallel(
         all_videos=videos,
         max_workers=max_workers,
-        delay=0.5
+        delay=2.0  # Increased delay to avoid 429 rate limit errors
     )
 
     successful_transcriptions = sum(1 for video in transcribed_videos if video['transcription_status'] == 'Success')
