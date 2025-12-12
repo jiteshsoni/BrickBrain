@@ -1,0 +1,102 @@
+# BrickBrain Databricks Asset Bundle Configuration
+
+# Common permissions template
+common_permissions: &permissions
+  permissions:
+    - level: CAN_VIEW
+      group_name: users
+    - level: CAN_MANAGE
+      user_name: jitesh.soni@databricks.com
+
+resources:
+  jobs:
+    data_ingestion_job:
+      name: ${bundle.target}-BrickBrain-data-ingestion
+      <<: *permissions
+      
+      tasks:
+        - task_key: BlogDataIngestion
+          notebook_task:
+            notebook_path: ../agent/retriever_tool/data_ingestion/blog_data/notebooks/DataIngestion.py
+            base_parameters:
+              bundle_root: ${workspace.file_path}
+              websites: ${var.blog_websites}
+              raw_blog_content_table: ${var.uc_catalog}.${var.schema}.raw_blog_content
+              git_source_info: "url:${bundle.git.origin_url}; branch:${bundle.git.branch}; commit:${bundle.git.commit}"
+
+        # - task_key: VideoDataIngestion_DustinVannoy
+        #   notebook_task:
+        #     notebook_path: ../agent/retriever_tool/data_ingestion/video_data/notebooks/DataIngestion.py
+        #     base_parameters:
+        #       bundle_root: ${workspace.file_path}
+        #       channel_name: ${var.youtube_channel}
+        #       max_videos: ${var.max_videos}
+        #       published_after: "2024-01-01"
+        #       raw_youtube_content_table: ${var.uc_catalog}.${var.schema}.raw_youtube_content
+        #       git_source_info: "url:${bundle.git.origin_url}; branch:${bundle.git.branch}; commit:${bundle.git.commit}"
+
+        # - task_key: VideoDataIngestion_CanadianDataGuy
+        #   notebook_task:
+        #     notebook_path: ../agent/retriever_tool/data_ingestion/video_data/notebooks/DataIngestion.py
+        #     base_parameters:
+        #       bundle_root: ${workspace.file_path}
+        #       channel_name: ${var.youtube_channel_2}
+        #       max_videos: ${var.max_videos_2}
+        #       published_after: ""
+        #       raw_youtube_content_table: ${var.uc_catalog}.${var.schema}.raw_youtube_content
+        #       git_source_info: "url:${bundle.git.origin_url}; branch:${bundle.git.branch}; commit:${bundle.git.commit}"
+
+        - task_key: ChunkingTask
+          depends_on:
+              - task_key: BlogDataIngestion
+              #- task_key: VideoDataIngestion_DustinVannoy
+              #- task_key: VideoDataIngestion_CanadianDataGuy
+          notebook_task:
+            notebook_path: ../agent/retriever_tool/data_ingestion/notebooks/ChunkingTask.py
+            base_parameters:
+              bundle_root: ${workspace.file_path}
+              raw_blog_content_table: ${var.uc_catalog}.${var.schema}.raw_blog_content
+              raw_youtube_content_table: ${var.uc_catalog}.${var.schema}.raw_youtube_content
+              preprocessed_content_table: ${var.uc_catalog}.${var.schema}.preprocessed_content
+              preprocessed_chunked_table: ${var.uc_catalog}.${var.schema}.preprocessed_content_chunked
+              chunk_size: ${var.chunk_size}
+              chunk_overlap: ${var.chunk_overlap}
+              llm_model: "databricks-meta-llama-3-3-70b-instruct"
+              git_source_info: "url:${bundle.git.origin_url}; branch:${bundle.git.branch}; commit:${bundle.git.commit}"
+
+        - task_key: VectorSearchIngestion
+          depends_on:
+              - task_key: ChunkingTask
+          notebook_task:
+            notebook_path: ../agent/retriever_tool/vector_search/notebooks/VectorSearchIngestion.py
+            base_parameters:
+              vector_search_endpoint: ${var.vector_search_endpoint}
+              vector_search_index: ${var.uc_catalog}.${var.schema}.brickbrain_index
+              preprocessed_data_table: ${var.uc_catalog}.${var.schema}.brickbrain_delta_table
+              preprocessed_chunked_table: ${var.uc_catalog}.${var.schema}.preprocessed_content_chunked
+              git_source_info: "url:${bundle.git.origin_url}; branch:${bundle.git.branch}; commit:${bundle.git.commit}"
+
+        - task_key: KnowledgeAssistantSync
+          depends_on:
+              - task_key: VectorSearchIngestion
+          notebook_task:
+            notebook_path: ../agent/retriever_tool/vector_search/notebooks/KnowledgeAssistantSync.py
+            base_parameters:
+              knowledge_assistant_id: ${var.knowledge_assistant_id}
+              git_source_info: "url:${bundle.git.origin_url}; branch:${bundle.git.branch}; commit:${bundle.git.commit}"
+
+    # Standalone VectorSearchIngestion job for independent testing/updates
+    vector_search_ingestion_job:
+      name: ${bundle.target}-BrickBrain-vector-search-ingestion
+      <<: *permissions
+      
+      tasks:
+        - task_key: VectorSearchIngestion
+          notebook_task:
+            notebook_path: ../agent/retriever_tool/vector_search/notebooks/VectorSearchIngestion.py
+            base_parameters:
+              vector_search_endpoint: ${var.vector_search_endpoint}
+              vector_search_index: ${var.uc_catalog}.${var.schema}.brickbrain_index
+              preprocessed_data_table: ${var.uc_catalog}.${var.schema}.brickbrain_delta_table
+              preprocessed_chunked_table: ${var.uc_catalog}.${var.schema}.preprocessed_content_chunked
+              git_source_info: "url:${bundle.git.origin_url}; branch:${bundle.git.branch}; commit:${bundle.git.commit}"
